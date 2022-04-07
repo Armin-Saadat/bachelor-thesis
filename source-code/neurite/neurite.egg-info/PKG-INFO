@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: neurite
+Version: 0.1
+Summary: Neural Networks Toolbox for Medical Imaging
+Home-page: https://github.com/adalca/neurite
+License: MIT
+Keywords: imaging,cnn
+Platform: UNKNOWN
+Classifier: Intended Audience :: Science/Research
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+License-File: LICENSE.md
+
+UNKNOWN
+
