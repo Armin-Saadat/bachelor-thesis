@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 # local imports
 os.environ['VXM_BACKEND'] = 'pytorch'
+os.environ['NEURITE_BACKEND'] = 'pytorch'
 import voxelmorph as vxm
 import neurite as ne
 
@@ -26,15 +27,15 @@ torch.backends.cudnn.deterministic = True
 
 
 # load & normalize
-# labeled_images = np.load('../data/labeled_images.npy', allow_pickle=True)
-unlabeled_images = np.load('../data/unlabeled_images.npy', allow_pickle=True)
+labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
+unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
 images = {}
 
-# for i in range(30):
-#     img = labeled_images[i].get('image')
-#     id_ = labeled_images[i].get('id')
-#     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+for i in range(30):
+    img = labeled_images[i].get('image')
+    id_ = labeled_images[i].get('id')
+    images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 
 for i in range(20):
     img = unlabeled_images[i].get('image')
