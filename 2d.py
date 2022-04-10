@@ -2,7 +2,6 @@
 import os, sys
 import glob
 import time
-import png
 import numpy as np
 import shutil
 import imageio
@@ -49,14 +48,14 @@ print(len(images))
 class Args():
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 10
-        self.bs = 20
+        self.epochs = 50
+        self.bs = 8
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.model_dir = './trained-models/torch/1/'
+        self.model_dir = './trained-models/torch/8/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -108,8 +107,7 @@ for epoch in range(args.initial_epoch, args.epochs):
 
     for p_id, p_imgs in images.items():
         volume_loss = 0        
-        a = torch.tensor(p_imgs).unsqueeze(1).to(device).float()                
-        print(a.shape)        
+        a = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
         
         volume_slices = 0
         for i in range((p_imgs.shape[0] - 1) // args.bs):            
@@ -140,7 +138,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     msg += 'time= %.4f, ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
 
-    loss_history.append(epoch_loss / volume_count)
+    loss_history.append((epoch_loss / volume_count).detach().cpu())
 
 # final model save
 model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
@@ -148,7 +146,7 @@ model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 plt.plot(loss_history)
 plt.xlabel('epoch')
 plt.ylabel('loss')
-plt.savefig("loss_history.png")
+plt.savefig("loss_history_8.png")
 plt.show()
 
 
