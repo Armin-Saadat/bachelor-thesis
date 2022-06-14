@@ -8,6 +8,7 @@ import imageio
 import pickle
 import random
 import torch
+from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 
 os.environ['VXM_BACKEND'] = 'pytorch'
@@ -42,10 +43,9 @@ print(len(images))
 #for p_id in images.keys():
 #    print(str(p_id) + ":", images.get(p_id).min(), "-", images.get(p_id).max())
 
-
 # //////////////////////////////////// Args /////////////////////////////////////////////
 
-class Args():
+class Args:
     def __init__(self):
         self.lr = 0.001
         self.epochs = 50
@@ -60,6 +60,26 @@ class Args():
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
 
+
+# //////////////////////////////////// DataLoader /////////////////////////////////////////////
+
+class OneDirDataset(Dataset):
+    def __init__(self, images, dis):
+        self.data = []
+        for p_id, p_imgs in images.items():
+            for i in range(p_imgs.shape[0] - dis):
+                self.data.append((p_imgs[i], p_imgs[i + dis]))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        outputs = [torch.tensor(d).unsqueeze(-1) for d in self.data[index]]
+
+        return tuple(outputs)
+
+dataset = OneDirDataset(images, dis=1)
+dataloader = DataLoader(dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
@@ -91,54 +111,47 @@ _ = model.train()
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
 
-# ///////////////////////////////////// train ////////////////////////////////////////////
+# ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
 loss_history = []
 
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if epoch + 1 % 50 == 0:
+    if (epoch + 1) % 50 == 0:
         model.save(os.path.join(args.model_dir, '%04d.pt' % epoch))
 
-    epoch_loss = 0    
-    volume_count = 0
-    epoch_start_time = time.time()        
+    epoch_loss = 0
+    epoch_length = 0
+    epoch_start_time = time.time()
 
-    for p_id, p_imgs in images.items():
-        volume_loss = 0        
-        a = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
-        
-        volume_slices = 0
-        for i in range((p_imgs.shape[0] - 1) // args.bs):            
-            #shape = (bs, 1, W, H)
-            moving_img = a[i*args.bs: (i+1) * args.bs]
-            fixed_img = a[i*args.bs + 1 : (i+1) * args.bs + 1]
-        
-            # predict
-            moved_img, flow = model(moving_img, fixed_img, registration=True)        
+    for inputs in dataloader:
+        # shape = (bs, 1, W, H)
+        [moving_img, fixed_img] = [d.to(device).float().permute(0, 3, 1, 2) for d in inputs]
 
-            # calculate loss                
-            loss = sim_loss_func(fixed_img, moved_img)
+        # predict
+        moved_img, flow = model(moving_img, fixed_img, registration=True)
 
-            # backpropagate and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+        # calculate loss
+        loss = sim_loss_func(fixed_img, moved_img)
 
-            volume_loss += loss * args.bs
-            volume_slices += args.bs
-        
-        epoch_loss += volume_loss / volume_slices 
-        volume_count += 1      
+        # backpropagate and optimize
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
-    # print epoch info  
+        epoch_loss += loss * args.bs
+        epoch_length += args.bs
+
+    epoch_loss /= epoch_length
+
+    # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
-    msg += 'loss= %.4e, ' % (epoch_loss / volume_count)
+    msg += 'loss= %.4e, ' % (epoch_loss)
     msg += 'time= %.4f, ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
 
-    loss_history.append((epoch_loss / volume_count).detach().cpu())
+    loss_history.append(epoch_loss.detach().cpu())
 
 # final model save
 model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
@@ -149,6 +162,39 @@ plt.ylabel('loss')
 plt.savefig("loss_history_8.png")
 plt.show()
 
+# ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
+print("Evaluation started.")
+patients_loss = []
+evaluation_start_time = time.time()
+k = 4
 
+for p_id, p_imgs in images.items():
+    p_loss = 0
+    p_slices = 0
+    a = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
 
+    for i in range((p_imgs.shape[0] - 1) // k):
+        # shape = (bs, 1, W, H)
+        moving_img = a[i * k: (i + 1) * k]
+        fixed_img = a[i * k + 1: (i + 1) * k + 1]
+
+        # predict
+        moved_img, flow = model(moving_img, fixed_img, registration=True)
+
+        # calculate loss
+        loss = sim_loss_func(fixed_img, moved_img)
+
+        # backpropagate and optimize
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        p_loss += loss * k
+        p_slices += k
+
+    patients_loss.append((p_loss / p_slices).detach().cpu())
+
+# print evaluation info
+print('loss= %.4e, ' % sum(patients_loss) / len(patients_loss))
+print('time= %.4f, ' % (time.time() - evaluation_start_time))
