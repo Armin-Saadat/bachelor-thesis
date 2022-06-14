@@ -55,7 +55,7 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.model_dir = './trained-models/torch/8/'
+        self.model_dir = './trained-models/torch/8_new/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -111,7 +111,7 @@ _ = model.train()
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
 
-# ///////////////////////////////////// evaluate ////////////////////////////////////////////
+# ///////////////////////////////////// train ////////////////////////////////////////////
 
 loss_history = []
 
@@ -159,7 +159,7 @@ model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 plt.plot(loss_history)
 plt.xlabel('epoch')
 plt.ylabel('loss')
-plt.savefig("loss_history_8.png")
+plt.savefig("loss_history_8_new.png")
 plt.show()
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
