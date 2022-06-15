@@ -35,7 +35,7 @@ for i in range(20):
     img = unlabeled_images[i].get('image')
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-print(len(images))
+print("Data loaded successfully. Total patients: ", len(images))
 
 
 ## verify normalize
@@ -49,7 +49,7 @@ class Args:
     def __init__(self):
         self.lr = 0.001
         self.epochs = 50
-        self.bs = 8
+        self.bs = 24
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
