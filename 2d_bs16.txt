@@ -1,0 +1,24 @@
+epoch 1/20, loss= 2.5911e-04, time= 127.0910 
+epoch 2/20, loss= 1.0596e-04, time= 134.5992 
+epoch 3/20, loss= 8.3452e-05, time= 136.3868 
+epoch 4/20, loss= 7.4395e-05, time= 136.8895 
+epoch 5/20, loss= 7.3236e-05, time= 137.0301 
+epoch 6/20, loss= 6.6910e-05, time= 137.0332 
+epoch 7/20, loss= 6.4025e-05, time= 137.0356 
+epoch 8/20, loss= 6.2485e-05, time= 137.0348 
+epoch 9/20, loss= 6.3450e-05, time= 136.9796 
+epoch 10/20, loss= 6.2204e-05, time= 136.9812 
+epoch 11/20, loss= 6.0984e-05, time= 137.0412 
+epoch 12/20, loss= 5.7686e-05, time= 137.0106 
+epoch 13/20, loss= 6.3701e-05, time= 137.0542 
+epoch 14/20, loss= 5.7720e-05, time= 137.0441 
+epoch 15/20, loss= 5.5868e-05, time= 137.0227 
+epoch 16/20, loss= 5.3723e-05, time= 137.0467 
+epoch 17/20, loss= 5.2712e-05, time= 137.0326 
+epoch 18/20, loss= 7.5601e-05, time= 136.9833 
+epoch 19/20, loss= 5.7311e-05, time= 137.0345 
+epoch 20/20, loss= 5.4778e-05, time= 136.9871 
+
+Evaluation started.
+loss= 7.6541e-05, time= 141.7780 
+
