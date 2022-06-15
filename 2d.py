@@ -35,7 +35,7 @@ for i in range(20):
     img = unlabeled_images[i].get('image')
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-print("Data loaded successfully. Total patients: ", len(images))
+print("\nData loaded successfully. Total patients:", len(images))
 
 
 ## verify normalize
@@ -48,14 +48,14 @@ print("Data loaded successfully. Total patients: ", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 50
-        self.bs = 24
+        self.epochs = 20
+        self.bs = 16
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.model_dir = './trained-models/torch/8_new/'
+        self.model_dir = './trained-models/torch/2d_bs16/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -148,7 +148,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
     msg += 'loss= %.4e, ' % (epoch_loss)
-    msg += 'time= %.4f, ' % (time.time() - epoch_start_time)
+    msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
 
     loss_history.append(epoch_loss.detach().cpu())
@@ -164,7 +164,7 @@ plt.show()
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
-print("Evaluation started.")
+print("\nEvaluation started.")
 patients_loss = []
 evaluation_start_time = time.time()
 k = 4
@@ -196,5 +196,6 @@ for p_id, p_imgs in images.items():
     patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
-print('loss= %.4e, ' % sum(patients_loss) / len(patients_loss))
-print('time= %.4f, ' % (time.time() - evaluation_start_time))
+msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
+msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
+print(msg, flush=True)
