@@ -55,7 +55,8 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.model_dir = './trained-models/torch/2d_bs16/'
+        self.run_name = '2d_bs16'
+        self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -159,7 +160,7 @@ model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 plt.plot(loss_history)
 plt.xlabel('epoch')
 plt.ylabel('loss')
-plt.savefig("loss_history_8_new.png")
+plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
