@@ -270,7 +270,7 @@ class FC_Bottleneck(nn.Module):
         # shape of imgs/lbs: (80, bs, 1, 512, 512)
         T, bs = images.shape[0] - 1, images.shape[1]
         assert bs == 1, "batch-size must be one."
-        assert T == 39, "sequence must be consisted of 40 slices."
+        assert T == 79, "sequence must be consisted of 40 slices."
 
         # shape of encoder_out: (79, bs, 64, 8, 8)
         X, X_history = [], []
