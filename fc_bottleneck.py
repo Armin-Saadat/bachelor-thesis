@@ -48,19 +48,19 @@ print("\nData loaded successfully. Total patients:", len(images))
 
 class Args:
     def __init__(self):
-        self.lr = 0.001
-        self.epochs = 30
+        self.lr = 0.0005
+        self.epochs = 100
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'fc_bottleneck_bs1'
+        self.run_name = 'fc_bottleneck_lr0005'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=True)
+os.makedirs(args.model_dir, exist_ok=False)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':

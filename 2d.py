@@ -59,7 +59,7 @@ class Args:
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=True)
+os.makedirs(args.model_dir, exist_ok=False)
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
