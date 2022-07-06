@@ -30,15 +30,14 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')
+    img = labeled_images[i].get('image')[:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')
+    img = unlabeled_images[i].get('image')[:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
-
 
 ## verify normalize
 #print('Images:')
@@ -50,39 +49,18 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 20
-        self.bs = 16
+        self.epochs = 2
+        self.bs = 1
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'rnn_bottleneck_bs1'
+        self.run_name = 'fc_bottleneck_bs1'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
-
-
-# //////////////////////////////////// DataLoader /////////////////////////////////////////////
-
-class OneDirDataset(Dataset):
-    def __init__(self, images, dis):
-        self.data = []
-        for p_id, p_imgs in images.items():
-            for i in range(p_imgs.shape[0] - dis):
-                self.data.append((p_imgs[i], p_imgs[i + dis]))
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        outputs = [torch.tensor(d).unsqueeze(-1) for d in self.data[index]]
-
-        return tuple(outputs)
-
-dataset = OneDirDataset(images, dis=1)
-dataloader = DataLoader(dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
@@ -289,12 +267,12 @@ class FC_Bottleneck(nn.Module):
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
     def forward(self, images, labels=None):
-        # shape of imgs/lbs: (40, bs, 1, 256, 256)
+        # shape of imgs/lbs: (80, bs, 1, 512, 512)
         T, bs = images.shape[0] - 1, images.shape[1]
         assert bs == 1, "batch-size must be one."
         assert T == 39, "sequence must be consisted of 40 slices."
 
-        # shape of encoder_out: (39, bs, 64, 8, 8)
+        # shape of encoder_out: (79, bs, 64, 8, 8)
         X, X_history = [], []
         for src, trg in zip(images[:-1], images[1:]):
             x, x_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
@@ -302,18 +280,18 @@ class FC_Bottleneck(nn.Module):
             X_history.append(x_history)
         encoder_out = torch.cat(X, dim=0)
 
-        # shape of lstm_out: (39, bs, 64, 8, 8)
+        # shape of lstm_out: (79, bs, 64, 8, 8)
         device = 'cuda' if images.is_cuda else 'cpu'
         h_0 = torch.randn(1, bs, self.hidden_size).to(device)
         c_0 = torch.randn(1, bs, self.hidden_size).to(device)
         lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(39, bs, -1), (h_0, c_0))
         lstm_out = lstm_out.view(39, bs, 64, 8, 8)
 
-        # shape of flow: (39, bs, 2, 256, 256)
+        # shape of flow: (79, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T)]
         flow = torch.cat(Y, dim=0)
 
-        # shape of moved_images = (39, bs, 1, 256, 256)
+        # shape of moved_images = (79, bs, 1, 512, 512)
         moved_images = torch.cat(
             [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(images[:-1], flow)], dim=0)
 
@@ -324,7 +302,7 @@ class FC_Bottleneck(nn.Module):
         else:
             return [moved_images, flow]
 
-model = FC_Bottleneck((256,256))
+model = FC_Bottleneck((512,512))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
@@ -333,6 +311,9 @@ model.to(device)
 _ = model.train()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+data = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.values()]
+print("len data:", len(data))
+print("shape of each data:", data[0].shape)
 
 # ///////////////////////////////////// train ////////////////////////////////////////////
 
@@ -341,7 +322,7 @@ loss_history = []
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if (epoch + 1) % 50 == 0:
+    if (epoch + 1) % 10 == 0:
         snapshot = {'model_state_dict': model.state_dict()}
         torch.save(snapshot, os.path.join(args.model_dir, '%04d.pt' % epoch))
         del snapshot
@@ -350,12 +331,11 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for inputs in dataloader:
-        # shape = (bs, 1, W, H)
-        [moving_img, fixed_img] = [d.to(device).float().permute(0, 3, 1, 2) for d in inputs]
+    for input in data:
 
-        # predict
-        moved_img, flow = model(moving_img, fixed_img, registration=True)
+        # shape of input = (T, bs, 1, W, H)
+        fixed_img = input[1:, :, :, :, :]
+        moved_img, flow = model(input.to(device).float())
 
         # calculate loss
         loss = sim_loss_func(fixed_img, moved_img)
