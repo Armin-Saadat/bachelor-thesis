@@ -284,8 +284,8 @@ class FC_Bottleneck(nn.Module):
         device = 'cuda' if images.is_cuda else 'cpu'
         h_0 = torch.randn(1, bs, self.hidden_size).to(device)
         c_0 = torch.randn(1, bs, self.hidden_size).to(device)
-        lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(39, bs, -1), (h_0, c_0))
-        lstm_out = lstm_out.view(39, bs, 64, 8, 8)
+        lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(T, bs, -1), (h_0, c_0))
+        lstm_out = lstm_out.view(T, bs, 64, 8, 8)
 
         # shape of flow: (79, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T)]
