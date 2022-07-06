@@ -28,11 +28,11 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')
+    img = labeled_images[i].get('image')[:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')
+    img = unlabeled_images[i].get('image')[:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -48,7 +48,7 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 20
+        self.epochs = 50
         self.bs = 16
         self.loss = 'mse'
         self.load_model = False
@@ -119,7 +119,7 @@ loss_history = []
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if (epoch + 1) % 50 == 0:
+    if (epoch + 1) % 10 == 0:
         model.save(os.path.join(args.model_dir, '%04d.pt' % epoch))
 
     epoch_loss = 0
