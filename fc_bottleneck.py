@@ -30,11 +30,11 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[:80, :, :]
+    img = labeled_images[i].get('image')[20:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[:80, :, :]
+    img = unlabeled_images[i].get('image')[20:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -60,7 +60,7 @@ class Args:
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=False)
+os.makedirs(args.model_dir, exist_ok=True)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
@@ -253,11 +253,11 @@ class FC_Bottleneck(nn.Module):
         self.image_size = image_size
         self.ndims = len(image_size)
 
-        enc_nf = [16, 16, 32, 32, 32, 64]
-        dec_nf = [64, 32, 32, 32, 32, 16, 16, 8, 2]
+        enc_nf = [16, 16, 32, 32, 32, 32, 32]
+        dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = self.hidden_size = 64 * 8 * 8
+        self.input_size = self.hidden_size = 32 * 4 * 4
         self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, batch_first=False)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -269,7 +269,7 @@ class FC_Bottleneck(nn.Module):
         # shape of imgs/lbs: (T, bs, 1, 512, 512)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of encoder_out: (T-1, bs, 64, 8, 8)
+        # shape of encoder_out: (T-1, bs, 32, 4, 4)
         X, X_history = [], []
         for src, trg in zip(images[:-1], images[1:]):
             x, x_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
@@ -277,12 +277,12 @@ class FC_Bottleneck(nn.Module):
             X_history.append(x_history)
         encoder_out = torch.cat(X, dim=0)
 
-        # shape of lstm_out: (T-1, bs, 64, 8, 8)
+        # shape of lstm_out: (T-1, bs, 32, 4, 4)
         device = 'cuda' if images.is_cuda else 'cpu'
         h_0 = torch.randn(1, bs, self.hidden_size).to(device)
         c_0 = torch.randn(1, bs, self.hidden_size).to(device)
         lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(T-1, bs, -1), (h_0, c_0))
-        lstm_out = lstm_out.view(T-1, bs, 64, 8, 8)
+        lstm_out = lstm_out.view(T-1, bs, 32, 4, 4)
 
         # shape of flow: (T-1, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T-1)]
@@ -329,11 +329,13 @@ for epoch in range(args.initial_epoch, args.epochs):
     for input in data:
 
         # shape of input = (T, bs, 1, W, H)
-        fixed_img = input[1:, :, :, :, :]
-        moved_img, flow = model(input.to(device).float())
+        input = input.to(device).float()
+
+        # predict
+        moved_img, flow = model(input)
 
         # calculate loss
-        loss = sim_loss_func(fixed_img, moved_img)
+        loss = sim_loss_func(input[1:, ...], moved_img)
 
         # backpropagate and optimize
         optimizer.zero_grad()
