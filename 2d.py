@@ -28,11 +28,11 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[:80, :, :]
+    img = labeled_images[i].get('image')[20:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[:80, :, :]
+    img = unlabeled_images[i].get('image')[20:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -48,7 +48,7 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 50
+        self.epochs = 30
         self.bs = 16
         self.loss = 'mse'
         self.load_model = False
