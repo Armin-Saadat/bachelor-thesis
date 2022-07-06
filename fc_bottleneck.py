@@ -49,7 +49,7 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 2
+        self.epochs = 30
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
@@ -327,7 +327,6 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_start_time = time.time()
 
     for input in data:
-
         # shape of input = (T, bs, 1, W, H)
         input = input.to(device).float()
 
@@ -349,7 +348,7 @@ for epoch in range(args.initial_epoch, args.epochs):
 
     # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
-    msg += 'loss= %.4e, ' % (epoch_loss)
+    msg += 'loss= %.4e, ' % epoch_loss
     msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
 
