@@ -257,8 +257,7 @@ class FC_Bottleneck(nn.Module):
         dec_nf = [64, 32, 32, 32, 32, 16, 16, 8, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = 64 * 8 * 8
-        self.hidden_size = 64 * 8 * 8
+        self.input_size = self.hidden_size = 64 * 16 * 16
         self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, batch_first=False)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -267,12 +266,10 @@ class FC_Bottleneck(nn.Module):
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
     def forward(self, images, labels=None):
-        # shape of imgs/lbs: (80, bs, 1, 512, 512)
-        T, bs = images.shape[0] - 1, images.shape[1]
-        assert bs == 1, "batch-size must be one."
-        assert T == 79, "sequence must be consisted of 40 slices."
+        # shape of imgs/lbs: (T, bs, 1, 512, 512)
+        T, bs = images.shape[0], images.shape[1]
 
-        # shape of encoder_out: (79, bs, 64, 8, 8)
+        # shape of encoder_out: (T-1, bs, 64, 16, 16)
         X, X_history = [], []
         for src, trg in zip(images[:-1], images[1:]):
             x, x_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
@@ -280,18 +277,18 @@ class FC_Bottleneck(nn.Module):
             X_history.append(x_history)
         encoder_out = torch.cat(X, dim=0)
 
-        # shape of lstm_out: (79, bs, 64, 8, 8)
+        # shape of lstm_out: (T-1, bs, 64, 16, 16)
         device = 'cuda' if images.is_cuda else 'cpu'
         h_0 = torch.randn(1, bs, self.hidden_size).to(device)
         c_0 = torch.randn(1, bs, self.hidden_size).to(device)
-        lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(T, bs, -1), (h_0, c_0))
-        lstm_out = lstm_out.view(T, bs, 64, 8, 8)
+        lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(T-1, bs, -1), (h_0, c_0))
+        lstm_out = lstm_out.view(T-1, bs, 64, 16, 16)
 
-        # shape of flow: (79, bs, 2, 512, 512)
-        Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T)]
+        # shape of flow: (T-1, bs, 2, 512, 512)
+        Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T-1)]
         flow = torch.cat(Y, dim=0)
 
-        # shape of moved_images = (79, bs, 1, 512, 512)
+        # shape of moved_images = (T-1, bs, 1, 512, 512)
         moved_images = torch.cat(
             [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(images[:-1], flow)], dim=0)
 
