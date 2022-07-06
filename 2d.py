@@ -59,7 +59,7 @@ class Args:
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=False)
+os.makedirs(args.model_dir, exist_ok=True)
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
@@ -168,7 +168,7 @@ plt.show()
 print("\nEvaluation started.")
 patients_loss = []
 evaluation_start_time = time.time()
-k = 4
+k = 1
 
 for p_id, p_imgs in images.items():
     p_loss = 0
