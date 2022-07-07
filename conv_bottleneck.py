@@ -63,7 +63,7 @@ class Args:
 
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=True)
+os.makedirs(args.model_dir, exist_ok=False)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
