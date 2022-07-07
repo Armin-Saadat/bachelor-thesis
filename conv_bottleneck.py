@@ -58,7 +58,7 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_bottleneck_lr001_zeroH0'
+        self.run_name = 'test1'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 
