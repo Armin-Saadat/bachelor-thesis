@@ -58,7 +58,7 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_bottleneck_lr001'
+        self.run_name = 'conv_bottleneck_lr001_zeroH0'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 
@@ -311,8 +311,8 @@ class Conv_Bottleneck(nn.Module):
 
         # shape of lstm_out: (T-1, bs, 32, 4, 4)
         device = 'cuda' if images.is_cuda else 'cpu'
-        h_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
-        c_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
+        h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
+        c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
         lstm_out = torch.zeros(0, bs, 32, 4, 4).to(device)
         for t in range(T - 1):
             input_t = encoder_out[t]
@@ -353,7 +353,7 @@ loss_history = []
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if (epoch + 1) % 10 == 0:
+    if (epoch + 1) % 50 == 0:
         snapshot = {'model_state_dict': model.state_dict()}
         torch.save(snapshot, os.path.join(args.model_dir, '%04d.pt' % epoch))
         del snapshot

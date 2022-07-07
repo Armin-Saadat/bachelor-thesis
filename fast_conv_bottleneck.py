@@ -305,7 +305,7 @@ class Fast_Conv_Bottleneck(nn.Module):
         h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
         c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
 
-        loss = 0
+        seq_loss = 0
         for t in range(T - 1):
             src = images[t].to(device).float() # (bs, 1, 512, 512)
             trg = images[t + 1].to(device).float() # (bs, 1, 512, 512)
@@ -315,9 +315,16 @@ class Fast_Conv_Bottleneck(nn.Module):
             moved_img = self.spatial_transformer(src, flow) # (bs, 1, 512, 512)
             if labels is not None:
                 moved_labels = self.spatial_transformer(labels[t].to(device).float(), flow)
-            loss += sim_loss_func(trg, moved_img)
+            loss = sim_loss_func(trg, moved_img)
+            
+            # backpropagate and optimize
+            optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            optimizer.step()
+            
+            seq_loss += loss.detach().cpu()
 
-        return loss
+        return seq_loss / (T - 1)
 
 model = Fast_Conv_Bottleneck((512, 512))
 if args.load_model:
@@ -349,12 +356,6 @@ for epoch in range(args.initial_epoch, args.epochs):
     for input in data:
         # shape of input = (T, bs, 1, W, H)
         loss = model(input)
-
-        # backpropagate and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
         epoch_loss += loss * args.bs
         epoch_length += args.bs
 
