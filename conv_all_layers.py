@@ -305,7 +305,7 @@ class Conv_All_Layers(nn.Module):
         h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
         c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
 
-        seq_loss = 0
+        loss = 0
         for src, trg in zip(images[:-1], images[1:]):
             src = src.to(device).float() # (bs, 1, 512, 512)
             trg = trg.to(device).float() # (bs, 1, 512, 512)
@@ -314,11 +314,9 @@ class Conv_All_Layers(nn.Module):
             flow = self.unet(h_state, 'decode', encoder_out_history) # (bs, 2, 512, 512)
             moved_img = self.spatial_transformer(src, flow) # (bs, 1, 512, 512)
 
-            loss = sim_loss_func(trg, moved_img)
-            
-            seq_loss += loss.detach().cpu()
+            loss += sim_loss_func(trg, moved_img)
 
-        return seq_loss / (T - 1)
+        return loss / (T - 1)
 
 model = Conv_All_Layers((512, 512))
 if args.load_model:
