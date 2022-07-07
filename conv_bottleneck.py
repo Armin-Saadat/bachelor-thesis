@@ -275,10 +275,10 @@ class RNNCell(nn.Module):
         out_gate = torch.sigmoid(out_gate)
         cell_gate = torch.tanh(cell_gate)
 
-        c_state = (forget_gate * c_state) + (in_gate * cell_gate)
-        h_state = out_gate * torch.tanh(c_state)
+        c_state_new = (forget_gate * c_state) + (in_gate * cell_gate)
+        h_state_new = out_gate * torch.tanh(c_state_new)
 
-        return h_state, c_state
+        return h_state_new, c_state_new
 
 
 class Conv_Bottleneck(nn.Module):
