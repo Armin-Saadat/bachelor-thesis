@@ -275,10 +275,10 @@ class RNNCell(nn.Module):
         out_gate = torch.sigmoid(out_gate)
         cell_gate = torch.tanh(cell_gate)
 
-        c_state_new = (forget_gate * c_state) + (in_gate * cell_gate)
-        h_state_new = out_gate * torch.tanh(c_state_new)
+        c_state = (forget_gate * c_state) + (in_gate * cell_gate)
+        h_state = out_gate * torch.tanh(c_state)
 
-        return h_state_new, c_state_new
+        return h_state, c_state
 
 
 class Conv_Bottleneck(nn.Module):
@@ -313,12 +313,17 @@ class Conv_Bottleneck(nn.Module):
 
         # shape of lstm_out: (T-1, bs, 32, 4, 4)
         device = 'cuda' if images.is_cuda else 'cpu'
-        h_state = torch.randn(T, bs, self.hidden_size, 4, 4).to(device)
-        c_state = torch.randn(T, bs, self.hidden_size, 4, 4).to(device)
+        h_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
+        c_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
+        lstm_out = torch.zeros((0, 0, 0, 0, 0))
+        print('lstm_out shape:', lstm_out.shape)
         for t in range(T - 1):
             input_t = encoder_out[t]
-            h_state[t + 1], c_state[t + 1] = self.RCell(input_t, h_state[t], c_state[t])
-        lstm_out = h_state[1:]
+            h_state, c_state = self.RCell(input_t, h_state, c_state)
+            lstm_out = torch.cat((lstm_out, h_state.unsqueeze(0)), 0)
+            print('lstm_out shape:', lstm_out.shape)
+        print('Yo Yo!')
+        print('lstm_out shape:', lstm_out.shape)
 
         # shape of flow: (T-1, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T - 1)]
