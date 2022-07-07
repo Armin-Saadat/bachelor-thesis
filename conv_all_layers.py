@@ -290,11 +290,11 @@ class Conv_All_Layers(nn.Module):
         self.image_size = image_size
         self.ndims = len(image_size)
 
-        enc_nf = [16, 16, 32, 32, 32, 32, 32]
-        dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
+        enc_nf = [16, 16, 32, 32, 32, 64]
+        dec_nf = [64, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = self.hidden_size = 32
+        self.input_size = self.hidden_size = 64
         self.RCell = RNNCell(self.input_size, self.hidden_size)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -303,21 +303,21 @@ class Conv_All_Layers(nn.Module):
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
     def forward(self, images, labels=None):
-        # shape of imgs/lbs: (T, bs, 1, 512, 512)
+        # shape of imgs/lbs: (T, bs, 1, 256, 256)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of h_state, c_state: (bs, 32, 4, 4)
+        # shape of h_state, c_state: (bs, 64, 4, 4)
         h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
         c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
 
         loss = 0
         for src, trg in zip(images[:-1], images[1:]):
-            src = src.to(device).float() # (bs, 1, 512, 512)
-            trg = trg.to(device).float() # (bs, 1, 512, 512)
-            encoder_out, encoder_out_history = self.unet(torch.cat([src, trg], dim=1), 'encode') # (bs, 32, 4, 4)
-            h_state, c_state = self.RCell(encoder_out, h_state, c_state) # (bs, 32, 4, 4)
-            flow = self.unet(h_state, 'decode', encoder_out_history) # (bs, 2, 512, 512)
-            moved_img = self.spatial_transformer(src, flow) # (bs, 1, 512, 512)
+            src = src.to(device).float()
+            trg = trg.to(device).float()
+            encoder_out, encoder_out_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
+            h_state, c_state = self.RCell(encoder_out, h_state, c_state)
+            flow = self.unet(h_state, 'decode', encoder_out_history)
+            moved_img = self.spatial_transformer(src, flow)
 
             loss += sim_loss_func(trg, moved_img)
 
