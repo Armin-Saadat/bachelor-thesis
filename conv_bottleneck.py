@@ -34,12 +34,10 @@ for i in range(30):
     img = labeled_images[i].get('image')[20:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    break
 for i in range(20):
     img = unlabeled_images[i].get('image')[20:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    break
 print("\nData loaded successfully. Total patients:", len(images))
 
 
@@ -53,7 +51,7 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 2
+        self.epochs = 30
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
@@ -315,15 +313,11 @@ class Conv_Bottleneck(nn.Module):
         device = 'cuda' if images.is_cuda else 'cpu'
         h_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
         c_state = torch.randn(bs, self.hidden_size, 4, 4).to(device)
-        lstm_out = torch.zeros((0, 0, 0, 0, 0))
-        print('lstm_out shape:', lstm_out.shape)
+        lstm_out = torch.zeros(0, bs, 32, 4, 4).to(device)
         for t in range(T - 1):
             input_t = encoder_out[t]
             h_state, c_state = self.RCell(input_t, h_state, c_state)
             lstm_out = torch.cat((lstm_out, h_state.unsqueeze(0)), 0)
-            print('lstm_out shape:', lstm_out.shape)
-        print('Yo Yo!')
-        print('lstm_out shape:', lstm_out.shape)
 
         # shape of flow: (T-1, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T - 1)]
