@@ -25,18 +25,21 @@ torch.backends.cudnn.deterministic = True
 # ////////////////////////////////////////// load & normalize ///////////////////////////////////////
 
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
-unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy',
-                           allow_pickle=True)
+unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
+
+torch.autograd.set_detect_anomaly(True)
 
 images = {}
 for i in range(30):
     img = labeled_images[i].get('image')[20:80, :, :]
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    break
 for i in range(20):
     img = unlabeled_images[i].get('image')[20:80, :, :]
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    break
 print("\nData loaded successfully. Total patients:", len(images))
 
 
@@ -49,20 +52,20 @@ print("\nData loaded successfully. Total patients:", len(images))
 
 class Args:
     def __init__(self):
-        self.lr = 0.0005
-        self.epochs = 100
+        self.lr = 0.001
+        self.epochs = 2
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'fc_bottleneck_lr0005'
+        self.run_name = 'conv_bottleneck_lr001'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=False)
+os.makedirs(args.model_dir, exist_ok=True)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
@@ -288,7 +291,7 @@ class Conv_Bottleneck(nn.Module):
         dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = self.hidden_size = 32 * 4 * 4
+        self.input_size = self.hidden_size = 32
         self.RCell = RNNCell(self.input_size, self.hidden_size)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -310,12 +313,12 @@ class Conv_Bottleneck(nn.Module):
 
         # shape of lstm_out: (T-1, bs, 32, 4, 4)
         device = 'cuda' if images.is_cuda else 'cpu'
-        h_state = torch.randn(T, bs, self.hidden_size).to(device)
-        c_state = torch.randn(T, bs, self.hidden_size).to(device)
+        h_state = torch.randn(T, bs, self.hidden_size, 4, 4).to(device)
+        c_state = torch.randn(T, bs, self.hidden_size, 4, 4).to(device)
         for t in range(T - 1):
-            input_t = encoder_out.view(T - 1, bs, -1)[t]
+            input_t = encoder_out[t]
             h_state[t + 1], c_state[t + 1] = self.RCell(input_t, h_state[t], c_state[t])
-        lstm_out = h_state[1:].view(T - 1, bs, 32, 4, 4)
+        lstm_out = h_state[1:]
 
         # shape of flow: (T-1, bs, 2, 512, 512)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T - 1)]
