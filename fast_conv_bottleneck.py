@@ -50,15 +50,15 @@ print("\nData loaded successfully. Total patients:", len(images))
 
 class Args:
     def __init__(self):
-        self.lr = 0.001
-        self.epochs = 30
+        self.lr = 0.0005
+        self.epochs = 100
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'fast_conv_bottleneck_lr001'
+        self.run_name = 'fast_conv_bottleneck_lr0005'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 
@@ -301,25 +301,24 @@ class Fast_Conv_Bottleneck(nn.Module):
         # shape of imgs/lbs: (T, bs, 1, 512, 512)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of h_state, c_state: (bs, 32, 4, 4)
-        h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
-        c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
-
         seq_loss = 0
-        for t in range(T - 1):
-            src = images[t].to(device).float() # (bs, 1, 512, 512)
-            trg = images[t + 1].to(device).float() # (bs, 1, 512, 512)
+        for src, trg in zip(images[:-1], images[1:]):
+            # shape of h_state, c_state: (bs, 32, 4, 4)
+            h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
+            c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
+
+            src = src.to(device).float() # (bs, 1, 512, 512)
+            trg = trg.to(device).float() # (bs, 1, 512, 512)
             encoder_out, encoder_out_history = self.unet(torch.cat([src, trg], dim=1), 'encode') # (bs, 32, 4, 4)
             h_state, c_state = self.RCell(encoder_out, h_state, c_state) # (bs, 32, 4, 4)
             flow = self.unet(h_state, 'decode', encoder_out_history) # (bs, 2, 512, 512)
             moved_img = self.spatial_transformer(src, flow) # (bs, 1, 512, 512)
-            if labels is not None:
-                moved_labels = self.spatial_transformer(labels[t].to(device).float(), flow)
+
             loss = sim_loss_func(trg, moved_img)
             
             # backpropagate and optimize
             optimizer.zero_grad()
-            loss.backward(retain_graph=True)
+            loss.backward(retain_graph=False)
             optimizer.step()
             
             seq_loss += loss.detach().cpu()
@@ -353,11 +352,14 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for input in data:
-        # shape of input = (T, bs, 1, W, H)
-        loss = model(input)
-        epoch_loss += loss * args.bs
-        epoch_length += args.bs
+    # shape of input = (T, bs, 1, W, H)
+    loss = model(torch.cat(data[:25], dim=1))
+    epoch_loss += loss * 25
+    epoch_length += 25
+
+    loss = model(torch.cat(data[25:50], dim=1))
+    epoch_loss += loss * 25
+    epoch_length += 25
 
     epoch_loss /= epoch_length
 
