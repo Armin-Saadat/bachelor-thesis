@@ -333,6 +333,9 @@ if args.load_model:
 model.to(device)
 _ = model.train()
 
+print('number of all params:', sum(p.numel() for p in model.parameters()))
+print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
+
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 data = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.values()]
 
