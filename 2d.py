@@ -55,7 +55,7 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_bs16'
+        self.run_name = 'test'
         self.model_dir = './trained-models/torch/' + self.run_name + '/'
 
 args = Args()
@@ -108,6 +108,9 @@ else:
 
 model.to(device)
 _ = model.train()
+
+print('number of all params:', sum(p.numel() for p in model.parameters()))
+print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
