@@ -32,19 +32,16 @@ torch.autograd.set_detect_anomaly(True)
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[20:80, :, :]
-    img = resize(img, (60, 256, 256), anti_aliasing=True)
+    img = labeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[20:80, :, :]
-    img = resize(img, (60, 256, 256), anti_aliasing=True)
+    img = unlabeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
-
-for img in images.values():
-    print(img.shape)
 
 ## verify normalize
 # print('Images:')
@@ -57,7 +54,7 @@ class Args:
     def __init__(self):
         self.lr = 0.001
         self.epochs = 30
-        self.bs = 1
+        self.bs = 5
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
@@ -323,7 +320,7 @@ class Conv_All_Layers(nn.Module):
 
         return loss / (T - 1)
 
-model = Conv_All_Layers((512, 512))
+model = Conv_All_Layers((256, 256))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
@@ -354,8 +351,10 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for input in data:
+    for k in range(40 // args.bs):
         # shape of input = (T, bs, 1, W, H)
+        input = torch.cat(data[k:k + args.bs], dim=1)
+        k += args.bs
 
         # predict
         loss = model(input)
