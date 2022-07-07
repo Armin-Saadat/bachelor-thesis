@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as nnf
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
+from skimage.transform import resize
 
 os.environ['VXM_BACKEND'] = 'pytorch'
 os.environ['NEURITE_BACKEND'] = 'pytorch'
@@ -32,14 +33,18 @@ torch.autograd.set_detect_anomaly(True)
 images = {}
 for i in range(30):
     img = labeled_images[i].get('image')[20:80, :, :]
+    img = resize(img, (60, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
     img = unlabeled_images[i].get('image')[20:80, :, :]
+    img = resize(img, (60, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
 
+for img in images.values():
+    print(img.shape)
 
 ## verify normalize
 # print('Images:')
