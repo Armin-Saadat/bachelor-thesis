@@ -28,11 +28,13 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[20:80, :, :]
+    img = labeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[20:80, :, :]
+    img = unlabeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -47,16 +49,16 @@ print("\nData loaded successfully. Total patients:", len(images))
 
 class Args:
     def __init__(self):
-        self.lr = 0.001
-        self.epochs = 30
+        self.lr = 0.0005
+        self.epochs = 100
         self.bs = 16
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'test'
-        self.model_dir = './trained-models/torch/' + self.run_name + '/'
+        self.run_name = '2d_lr0005'
+        self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -93,14 +95,14 @@ else:
 
 # /////////////////////////////////////// model //////////////////////////////////////////
 
-enc_nf = [16, 32, 32, 32]
+enc_nf = [16, 32, 32, 32, 32]
 dec_nf = [32, 32, 32, 32, 32, 16, 16]
 
 if args.load_model:
     model = vxm.networks.VxmDense.load(args.load_model, device)
 else:
     model = vxm.networks.VxmDense(
-        inshape=(512, 512),
+        inshape=(256, 256),
         nb_unet_features=[enc_nf, dec_nf],
         int_steps=args.int_steps,
         int_downsize=args.int_downsize

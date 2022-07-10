@@ -52,16 +52,16 @@ print("\nData loaded successfully. Total patients:", len(images))
 
 class Args:
     def __init__(self):
-        self.lr = 0.001
-        self.epochs = 30
-        self.bs = 5
+        self.lr = 0.0005
+        self.epochs = 100
+        self.bs = 4
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'test'
-        self.model_dir = './trained-models/torch/' + self.run_name + '/'
+        self.run_name = 'conv_bottleneck_lr0005'
+        self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 
 args = Args()
@@ -287,11 +287,11 @@ class Conv_All_Layers(nn.Module):
         self.image_size = image_size
         self.ndims = len(image_size)
 
-        enc_nf = [16, 16, 32, 32, 32, 64]
-        dec_nf = [64, 32, 32, 32, 32, 16, 16, 2]
+        enc_nf = [16, 32, 32, 32, 32]
+        dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = self.hidden_size = 64
+        self.input_size = self.hidden_size = 32
         self.RCell = RNNCell(self.input_size, self.hidden_size)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -303,9 +303,9 @@ class Conv_All_Layers(nn.Module):
         # shape of imgs/lbs: (T, bs, 1, 256, 256)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of h_state, c_state: (bs, 64, 4, 4)
-        h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
-        c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
+        # shape of h_state, c_state: (bs, 64, 8, 8)
+        h_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
+        c_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
 
         loss = 0
         for src, trg in zip(images[:-1], images[1:]):

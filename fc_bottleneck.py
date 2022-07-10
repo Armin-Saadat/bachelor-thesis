@@ -30,11 +30,13 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[20:80, :, :]
+    img = labeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[20:80, :, :]
+    img = unlabeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -56,8 +58,8 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'test4'
-        self.model_dir = './trained-models/torch/' + self.run_name + '/'
+        self.run_name = 'fc_bottleneck_lr0005'
+        self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=False)
@@ -253,11 +255,11 @@ class FC_Bottleneck(nn.Module):
         self.image_size = image_size
         self.ndims = len(image_size)
 
-        enc_nf = [16, 16, 32, 32, 32, 32, 32]
+        enc_nf = [16, 32, 32, 32, 32]
         dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
-        self.input_size = self.hidden_size = 32 * 4 * 4
+        self.input_size = self.hidden_size = 32 * 8 * 8
         self.lstm = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size, batch_first=False)
 
         Conv = getattr(nn, 'Conv%dd' % self.ndims)
@@ -266,10 +268,10 @@ class FC_Bottleneck(nn.Module):
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
     def forward(self, images, labels=None):
-        # shape of imgs/lbs: (T, bs, 1, 512, 512)
+        # shape of imgs/lbs: (T, bs, 1, 256, 256)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of encoder_out: (T-1, bs, 32, 4, 4)
+        # shape of encoder_out: (T-1, bs, 32, 8, 8)
         X, X_history = [], []
         for src, trg in zip(images[:-1], images[1:]):
             x, x_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
@@ -277,18 +279,18 @@ class FC_Bottleneck(nn.Module):
             X_history.append(x_history)
         encoder_out = torch.cat(X, dim=0)
 
-        # shape of lstm_out: (T-1, bs, 32, 4, 4)
+        # shape of lstm_out: (T-1, bs, 32, 8, 8)
         device = 'cuda' if images.is_cuda else 'cpu'
         h_0 = torch.randn(1, bs, self.hidden_size).to(device)
         c_0 = torch.randn(1, bs, self.hidden_size).to(device)
         lstm_out, (h_n, c_n) = self.lstm(encoder_out.view(T-1, bs, -1), (h_0, c_0))
-        lstm_out = lstm_out.view(T-1, bs, 32, 4, 4)
+        lstm_out = lstm_out.view(T-1, bs, 32, 8, 8)
 
-        # shape of flow: (T-1, bs, 2, 512, 512)
+        # shape of flow: (T-1, bs, 2, 256, 256)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T-1)]
         flow = torch.cat(Y, dim=0)
 
-        # shape of moved_images = (T-1, bs, 1, 512, 512)
+        # shape of moved_images = (T-1, bs, 1, 256, 256)
         moved_images = torch.cat(
             [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(images[:-1], flow)], dim=0)
 
@@ -299,7 +301,7 @@ class FC_Bottleneck(nn.Module):
         else:
             return [moved_images, flow]
 
-model = FC_Bottleneck((512,512))
+model = FC_Bottleneck((256,256))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
@@ -320,7 +322,7 @@ loss_history = []
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if (epoch + 1) % 10 == 0:
+    if (epoch + 1) % 50 == 0:
         snapshot = {'model_state_dict': model.state_dict()}
         torch.save(snapshot, os.path.join(args.model_dir, '%04d.pt' % epoch))
         del snapshot

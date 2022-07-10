@@ -31,11 +31,13 @@ torch.autograd.set_detect_anomaly(True)
 
 images = {}
 for i in range(30):
-    img = labeled_images[i].get('image')[20:80, :, :]
+    img = labeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 for i in range(20):
-    img = unlabeled_images[i].get('image')[20:80, :, :]
+    img = unlabeled_images[i].get('image')[30:70, :, :]
+    img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
@@ -285,7 +287,7 @@ class Conv_Bottleneck(nn.Module):
         self.image_size = image_size
         self.ndims = len(image_size)
 
-        enc_nf = [16, 16, 32, 32, 32, 32, 32]
+        enc_nf = [16, 32, 32, 32, 32]
         dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
         self.unet = MyUnet(inshape=image_size, infeats=2, nb_features=[enc_nf, dec_nf])
 
@@ -298,10 +300,10 @@ class Conv_Bottleneck(nn.Module):
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
     def forward(self, images, labels=None):
-        # shape of imgs/lbs: (T, bs, 1, 512, 512)
+        # shape of imgs/lbs: (T, bs, 1, 256, 256)
         T, bs = images.shape[0], images.shape[1]
 
-        # shape of encoder_out: (T-1, bs, 32, 4, 4)
+        # shape of encoder_out: (T-1, bs, 32, 8, 8)
         X, X_history = [], []
         for src, trg in zip(images[:-1], images[1:]):
             x, x_history = self.unet(torch.cat([src, trg], dim=1), 'encode')
@@ -309,21 +311,21 @@ class Conv_Bottleneck(nn.Module):
             X_history.append(x_history)
         encoder_out = torch.cat(X, dim=0)
 
-        # shape of lstm_out: (T-1, bs, 32, 4, 4)
+        # shape of lstm_out: (T-1, bs, 32, 8, 8)
         device = 'cuda' if images.is_cuda else 'cpu'
-        h_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
-        c_state = torch.zeros(bs, self.hidden_size, 4, 4).to(device)
-        lstm_out = torch.zeros(0, bs, 32, 4, 4).to(device)
+        h_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
+        c_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
+        lstm_out = torch.zeros(0, bs, 32, 8, 8).to(device)
         for t in range(T - 1):
             input_t = encoder_out[t]
             h_state, c_state = self.RCell(input_t, h_state, c_state)
             lstm_out = torch.cat((lstm_out, h_state.unsqueeze(0)), 0)
 
-        # shape of flow: (T-1, bs, 2, 512, 512)
+        # shape of flow: (T-1, bs, 2, 256, 256)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T - 1)]
         flow = torch.cat(Y, dim=0)
 
-        # shape of moved_images = (T-1, bs, 1, 512, 512)
+        # shape of moved_images = (T-1, bs, 1, 256, 256)
         moved_images = torch.cat(
             [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(images[:-1], flow)], dim=0)
 
@@ -335,7 +337,7 @@ class Conv_Bottleneck(nn.Module):
             return [moved_images, flow]
 
 
-model = Conv_Bottleneck((512, 512))
+model = Conv_Bottleneck((256, 256))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
