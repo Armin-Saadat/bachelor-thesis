@@ -53,14 +53,14 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 100
+        self.epochs = 250
         self.bs = 4
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_bottleneck_lr0005'
+        self.run_name = 'conv_bottleneck_lr0005_2'
         self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 
@@ -351,7 +351,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for k in range(40 // args.bs):
+    for k in range(50 // args.bs):
         # shape of input = (T, bs, 1, W, H)
         input = torch.cat(data[k:k + args.bs], dim=1)
         k += args.bs
