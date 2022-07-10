@@ -10,6 +10,7 @@ import random
 import torch
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
+from skimage.transform import resize
 
 os.environ['VXM_BACKEND'] = 'pytorch'
 os.environ['NEURITE_BACKEND'] = 'pytorch'

@@ -53,14 +53,14 @@ print("\nData loaded successfully. Total patients:", len(images))
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 100
+        self.epochs = 250
         self.bs = 4
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_bottleneck_lr0005'
+        self.run_name = 'conv_bottleneck_lr0005_2'
         self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 

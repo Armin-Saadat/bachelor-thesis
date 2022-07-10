@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as nnf
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
+from skimage.transform import resize
 
 os.environ['VXM_BACKEND'] = 'pytorch'
 os.environ['NEURITE_BACKEND'] = 'pytorch'
@@ -52,7 +53,7 @@ class Args:
     def __init__(self):
         self.lr = 0.0005
         self.epochs = 100
-        self.bs = 1
+        self.bs = 2
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
@@ -62,7 +63,7 @@ class Args:
         self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=False)
+os.makedirs(args.model_dir, exist_ok=True)
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
@@ -331,8 +332,10 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for input in data:
+    for k in range(50 // args.bs):
         # shape of input = (T, bs, 1, W, H)
+        input = torch.cat(data[k:k + args.bs], dim=1)
+        k += args.bs    
         input = input.to(device).float()
 
         # predict
