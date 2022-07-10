@@ -136,6 +136,35 @@ class SpatialTransformer(nn.Module):
         return nnf.grid_sample(src, new_locs, align_corners=True, mode=self.mode)
 
 
+class RNNCell(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(RNNCell, self).__init__()
+        self.input_size = int(input_size)
+        self.hidden_size = int(hidden_size)
+        self.in_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
+        self.forget_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
+        self.out_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
+        self.cell_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
+
+    def forward(self, input, h_state, c_state):
+        conc_inputs = torch.cat((input, h_state), 1)
+
+        in_gate = self.in_gate(conc_inputs)
+        forget_gate = self.forget_gate(conc_inputs)
+        out_gate = self.out_gate(conc_inputs)
+        cell_gate = self.cell_gate(conc_inputs)
+
+        in_gate = torch.sigmoid(in_gate)
+        forget_gate = torch.sigmoid(forget_gate)
+        out_gate = torch.sigmoid(out_gate)
+        cell_gate = torch.tanh(cell_gate)
+
+        c_state = (forget_gate * c_state) + (in_gate * cell_gate)
+        h_state = out_gate * torch.tanh(c_state)
+
+        return h_state, c_state
+
+
 class MyUnet(nn.Module):
     def __init__(self,
                  inshape=None,
@@ -221,6 +250,20 @@ class MyUnet(nn.Module):
         # cache final number of features
         self.final_nf = prev_nf
 
+        self.enc_nf = nb_features[0]
+        self.RCell = []
+        for nf in self.enc_nf:
+            self.RCell.append(RNNCell(nf, nf))
+        self.h_state = []
+        self.c_state = []
+
+    def reset_h_c(self):
+        self.h_state = []
+        self.c_state = []
+        for i in self.enc_nf:
+            self.h_state.append(None)
+            self.c_state.append(None)
+
     def forward(self, x, task, x_history_=None):
 
         # encoder forward pass
@@ -229,7 +272,12 @@ class MyUnet(nn.Module):
             for level, convs in enumerate(self.encoder):
                 for conv in convs:
                     x = conv(x)
-                x_history.append(x)
+                if self.h_state[level] is None:
+                    self.h_state[level] = torch.zeros_like(x).to(device)
+                if self.c_state[level] is None:
+                    self.c_state[level] = torch.zeros_like(x).to(device)
+                h_state, c_state = self.RCell[level](x, h_state, c_state)
+                x_history.append(h_state)
                 x = self.pooling[level](x)
 
             return x, x_history
@@ -250,35 +298,6 @@ class MyUnet(nn.Module):
                 x = conv(x)
 
             return x
-
-
-class RNNCell(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(RNNCell, self).__init__()
-        self.input_size = int(input_size)
-        self.hidden_size = int(hidden_size)
-        self.in_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
-        self.forget_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
-        self.out_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
-        self.cell_gate = nn.Conv2d(input_size + hidden_size, hidden_size, 3, 1, 1)
-
-    def forward(self, input, h_state, c_state):
-        conc_inputs = torch.cat((input, h_state), 1)
-
-        in_gate = self.in_gate(conc_inputs)
-        forget_gate = self.forget_gate(conc_inputs)
-        out_gate = self.out_gate(conc_inputs)
-        cell_gate = self.cell_gate(conc_inputs)
-
-        in_gate = torch.sigmoid(in_gate)
-        forget_gate = torch.sigmoid(forget_gate)
-        out_gate = torch.sigmoid(out_gate)
-        cell_gate = torch.tanh(cell_gate)
-
-        c_state = (forget_gate * c_state) + (in_gate * cell_gate)
-        h_state = out_gate * torch.tanh(c_state)
-
-        return h_state, c_state
 
 
 class Conv_All_Layers(nn.Module):
@@ -306,6 +325,7 @@ class Conv_All_Layers(nn.Module):
         # shape of h_state, c_state: (bs, 32, 8, 8)
         h_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
         c_state = torch.zeros(bs, self.hidden_size, 8, 8).to(device)
+        self.unet.reset_h_c()
 
         loss = 0
         for src, trg in zip(images[:-1], images[1:]):
