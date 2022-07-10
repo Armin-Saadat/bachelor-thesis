@@ -36,11 +36,13 @@ for i in range(30):
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    break
 for i in range(20):
     img = unlabeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    break
 print("\nData loaded successfully. Total patients:", len(images))
 number_of_patients = len(images)
 
@@ -61,7 +63,7 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_all_layers_lr0005'
+        self.run_name = 'test'
         self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 
@@ -340,17 +342,6 @@ class Conv_All_Layers(nn.Module):
             loss += sim_loss_func(trg, moved_img)
 
         return loss / (T - 1)
-
-model = RNNCell(32, 32)
-print('number of all params:', sum(p.numel() for p in model.parameters()))
-print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
-
-
-enc_nf = [16, 32, 32, 32, 32]
-dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
-model = MyUnet(inshape=(256, 256), infeats=2, nb_features=[enc_nf, dec_nf])
-print('number of all params:', sum(p.numel() for p in model.parameters()))
-print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
 
 
 model = Conv_All_Layers((256, 256))
