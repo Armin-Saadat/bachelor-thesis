@@ -58,11 +58,11 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_lr0005'
+        self.run_name = 'test'
         self.model_dir = './trained-models/new/' + self.run_name + '/'
 
 args = Args()
-os.makedirs(args.model_dir, exist_ok=False)
+os.makedirs(args.model_dir, exist_ok=True)
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
