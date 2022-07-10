@@ -42,6 +42,7 @@ for i in range(20):
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
 print("\nData loaded successfully. Total patients:", len(images))
+number_of_patients = len(images)
 
 ## verify normalize
 # print('Images:')
@@ -54,7 +55,7 @@ class Args:
     def __init__(self):
         self.lr = 0.0005
         self.epochs = 100
-        self.bs = 4
+        self.bs = 1
         self.loss = 'mse'
         self.load_model = False
         self.initial_epoch = 0
@@ -251,18 +252,18 @@ class MyUnet(nn.Module):
         self.final_nf = prev_nf
 
         self.enc_nf = nb_features[0]
-        self.RCell = []
+        self.RCells = nn.ModuleList()
         for nf in self.enc_nf:
-            self.RCell.append(RNNCell(nf, nf))
-        self.h_state = []
-        self.c_state = []
+            self.RCells.append(RNNCell(nf, nf).to(device))
+        self.h_states = []
+        self.c_states = []
 
     def reset_h_c(self):
-        self.h_state = []
-        self.c_state = []
+        self.h_states = []
+        self.c_states = []
         for i in self.enc_nf:
-            self.h_state.append(None)
-            self.c_state.append(None)
+            self.h_states.append(None)
+            self.c_states.append(None)
 
     def forward(self, x, task, x_history_=None):
 
@@ -272,12 +273,12 @@ class MyUnet(nn.Module):
             for level, convs in enumerate(self.encoder):
                 for conv in convs:
                     x = conv(x)
-                if self.h_state[level] is None:
-                    self.h_state[level] = torch.zeros_like(x).to(device)
-                if self.c_state[level] is None:
-                    self.c_state[level] = torch.zeros_like(x).to(device)
-                h_state, c_state = self.RCell[level](x, h_state, c_state)
-                x_history.append(h_state)
+                if self.h_states[level] is None:
+                    self.h_states[level] = torch.zeros_like(x).to(device)
+                if self.c_states[level] is None:
+                    self.c_states[level] = torch.zeros_like(x).to(device)
+                self.h_states[level], self.c_states[level] = self.RCells[level](x, self.h_states[level], self.c_states[level])
+                x_history.append(self.h_states[level])
                 x = self.pooling[level](x)
 
             return x, x_history
@@ -340,6 +341,18 @@ class Conv_All_Layers(nn.Module):
 
         return loss / (T - 1)
 
+model = RNNCell(32, 32)
+print('number of all params:', sum(p.numel() for p in model.parameters()))
+print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
+
+
+enc_nf = [16, 32, 32, 32, 32]
+dec_nf = [32, 32, 32, 32, 32, 16, 16, 2]
+model = MyUnet(inshape=(256, 256), infeats=2, nb_features=[enc_nf, dec_nf])
+print('number of all params:', sum(p.numel() for p in model.parameters()))
+print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
+
+
 model = Conv_All_Layers((256, 256))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
@@ -371,7 +384,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for k in range(50 // args.bs):
+    for k in range(number_of_patients // args.bs):
         # shape of input = (T, bs, 1, W, H)
         input = torch.cat(data[k:k + args.bs], dim=1)
         k += args.bs
