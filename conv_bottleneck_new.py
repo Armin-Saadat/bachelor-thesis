@@ -351,7 +351,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_length = 0
     epoch_start_time = time.time()
 
-    for k in range(40 // args.bs):
+    for k in range(50 // args.bs):
         # shape of input = (T, bs, 1, W, H)
         input = torch.cat(data[k:k + args.bs], dim=1)
         k += args.bs
