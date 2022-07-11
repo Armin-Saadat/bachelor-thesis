@@ -36,13 +36,11 @@ for i in range(30):
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    break
 for i in range(20):
     img = unlabeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    break
 print("\nData loaded successfully. Total patients:", len(images))
 number_of_patients = len(images)
 
@@ -56,7 +54,7 @@ number_of_patients = len(images)
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 100
+        self.epochs = 300
         self.bs = 1
         self.loss = 'mse'
         self.load_model = False
