@@ -29,8 +29,9 @@ torch.autograd.set_detect_anomaly(True)
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
-# 0-background, 1-spleen, 2-left kidney, 3-right kidney, 6-liver, 8-left muscle, 9-right muscle
+organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
 selected_organ = 6
+print("selected organ:", organs[selected_organ])
 
 images = {}
 labels = {}
