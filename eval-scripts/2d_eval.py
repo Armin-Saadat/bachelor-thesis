@@ -30,7 +30,7 @@ labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
-selected_organ = 6
+selected_organ = 2
 print("\nselected organ:", organs[selected_organ])
 
 images = {}
@@ -63,12 +63,29 @@ args = Args()
 
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
+
+class Dice:
+    """
+    N-D dice for segmentation
+    """
+
+    def loss(self, y_true, y_pred):
+        print("Hi")
+        ndims = len(list(y_pred.size())) - 2
+        vol_axes = list(range(2, ndims + 2))
+        top = 2 * (y_true * y_pred).sum(dim=vol_axes)
+        bottom = torch.clamp((y_true + y_pred).sum(dim=vol_axes), min=1e-5)
+        dice = top / bottom
+        valid_slices_number = torch.sum(torch.where(dice == 0, torch.zeros_like(dice), torch.ones_like(dice)))
+        dice = torch.sum(dice) / valid_slices_number
+        return -dice
+
 if args.loss == 'ncc':
     sim_loss_func = vxm.losses.NCC().loss
 elif args.loss == 'mse':
     sim_loss_func = vxm.losses.MSE().loss
 elif args.loss == 'dice':
-    sim_loss_func = vxm.losses.Dice().loss
+    sim_loss_func = Dice().loss
 else:
     raise ValueError('loss should be "mse" or "ncc" or "dice", but found "%s"' % args.image_loss)
 
@@ -114,8 +131,8 @@ with torch.no_grad():
             moving_img = imgs[i * k: (i + 1) * k]
             fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
 
-            moving_lb = imgs[i * k: (i + 1) * k]
-            fixed_lb = imgs[i * k + 1: (i + 1) * k + 1]
+            moving_lb = lbs[i * k: (i + 1) * k]
+            fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
 
             # predict
             moved_img, flow = model(moving_img, fixed_img, registration=True)
@@ -123,7 +140,7 @@ with torch.no_grad():
             moved_lb = model.transformer(moving_lb, flow)
 
             # calculate loss
-            loss = sim_loss_func(fixed_lb, moved_lb)
+            loss = sim_loss_func(fixed_lb, fixed_lb)
 
             p_loss += loss * k
             p_slices += k
@@ -131,6 +148,6 @@ with torch.no_grad():
         patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
-msg = 'loss= %.4f, ' % (sum(patients_loss) / len(patients_loss))
+msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
 msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
 print(msg, flush=True)

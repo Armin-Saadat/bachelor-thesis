@@ -86,7 +86,7 @@ class Dice:
         vol_axes = list(range(2, ndims + 2))
         top = 2 * (y_true * y_pred).sum(dim=vol_axes)
         bottom = torch.clamp((y_true + y_pred).sum(dim=vol_axes), min=1e-5)
-        dice = torch.mean(top / bottom)
+        dice = torch.mean(top / bottom) 
         return -dice
 
 

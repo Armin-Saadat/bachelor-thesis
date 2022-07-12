@@ -54,7 +54,7 @@ number_of_patients = len(images)
 class Args:
     def __init__(self):
         self.bs = 1
-        self.loss = 'dice'
+        self.loss = 'mse'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/conv_all_layers/0250.pt"
         self.int_steps = 7
         self.int_downsize = 2
@@ -325,11 +325,11 @@ class Conv_All_Layers(nn.Module):
         self.unet.reset_h_c()
 
         loss = 0
-        for src_img, trg_img, srs_lb, trg_lb in zip(images[:-1], images[1:], labels[:-1], labels[1:]):
+        for src_img, trg_img, src_lb, trg_lb in zip(images[:-1], images[1:], labels[:-1], labels[1:]):
             src_img = src_img.to(device).float()
             trg_img = trg_img.to(device).float()
-            src_lb = src_img.to(device).float()
-            trg_lb = trg_img.to(device).float()
+            src_lb = src_lb.to(device).float()
+            trg_lb = trg_lb.to(device).float()
             encoder_out, encoder_out_history = self.unet(torch.cat([src_img, trg_img], dim=1), 'encode')
             h_state, c_state = self.RCell(encoder_out, h_state, c_state)
             flow = self.unet(h_state, 'decode', encoder_out_history)
@@ -354,7 +354,7 @@ print('number of trainable params:', sum(p.numel() for p in model.parameters() i
 
 # shape = (40, 1, 1, 256, 256)
 imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.values()]
-lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.values()]
+lbs = [torch.tensor(p_lbs).unsqueeze(1).unsqueeze(1) for p_lbs in labels.values()]
 
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
