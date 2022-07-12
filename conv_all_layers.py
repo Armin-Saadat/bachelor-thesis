@@ -22,13 +22,12 @@ import neurite as ne
 device = 'cuda'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 torch.backends.cudnn.deterministic = True
+torch.autograd.set_detect_anomaly(True)
 
 # ////////////////////////////////////////// load & normalize ///////////////////////////////////////
 
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
-
-torch.autograd.set_detect_anomaly(True)
 
 images = {}
 labels = {}
@@ -67,12 +66,12 @@ class Args:
         self.epochs = 5
         self.bs = 1
         self.loss = 'mse'
-        self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/conv_all_layers/0250.pt"
+        self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
         self.run_name = 'test1'
-        self.model_dir = './trained-models/test/' + self.run_name + '/'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/test/' + self.run_name + '/'
 
 
 args = Args()
@@ -354,7 +353,7 @@ class Conv_All_Layers(nn.Module):
 
 model = Conv_All_Layers((256, 256))
 if args.load_model:
-    print("loading model.")
+    print("loading model ...")
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
     print("model loaded successfully.")

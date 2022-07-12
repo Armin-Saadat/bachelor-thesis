@@ -59,7 +59,7 @@ class Args:
         self.int_steps = 7
         self.int_downsize = 2
         self.run_name = '2d_long'
-        self.model_dir = './trained-models/256x256/' + self.run_name + '/'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)

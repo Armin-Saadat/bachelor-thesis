@@ -61,7 +61,7 @@ class Args:
         self.int_steps = 7
         self.int_downsize = 2
         self.run_name = 'conv_bottleneck_lr0005_2'
-        self.model_dir = './trained-models/new/' + self.run_name + '/'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/new/' + self.run_name + '/'
 
 
 args = Args()
