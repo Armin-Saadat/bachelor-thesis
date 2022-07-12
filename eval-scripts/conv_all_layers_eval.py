@@ -54,7 +54,7 @@ number_of_patients = len(images)
 class Args:
     def __init__(self):
         self.bs = 1
-        self.loss = 'mse'
+        self.loss = 'dice'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/conv_all_layers/0250.pt"
         self.int_steps = 7
         self.int_downsize = 2
@@ -63,12 +63,28 @@ args = Args()
 
 
 # ///////////////////////////////////// loss ////////////////////////////////////////////
+
+class Dice:
+    """
+    N-D dice for segmentation
+    """
+
+    def loss(self, y_true, y_pred):
+        y_true = torch.where(y_true > 0, torch.ones_like(y_true), torch.zeros_like(y_true))
+        y_pred = torch.where(y_pred > 0, torch.ones_like(y_pred), torch.zeros_like(y_pred))
+        intersect = torch.sum(y_pred * y_true)
+        sum_ = torch.sum(y_true) + torch.sum(y_pred)
+        if sum_ == 0:
+            return False
+        dice = (2 * intersect) / sum_
+        return dice
+
 if args.loss == 'ncc':
     sim_loss_func = vxm.losses.NCC().loss
 elif args.loss == 'mse':
     sim_loss_func = vxm.losses.MSE().loss
 elif args.loss == 'dice':
-    sim_loss_func = vxm.losses.Dice().loss
+    sim_loss_func = Dice().loss
 else:
     raise ValueError('loss should be "mse" or "ncc" or "dice", but found "%s"' % args.image_loss)
 
@@ -325,6 +341,7 @@ class Conv_All_Layers(nn.Module):
         self.unet.reset_h_c()
 
         loss = 0
+        t = 0
         for src_img, trg_img, src_lb, trg_lb in zip(images[:-1], images[1:], labels[:-1], labels[1:]):
             src_img = src_img.to(device).float()
             trg_img = trg_img.to(device).float()
@@ -335,9 +352,13 @@ class Conv_All_Layers(nn.Module):
             flow = self.unet(h_state, 'decode', encoder_out_history)
             moved_lb = self.spatial_transformer(src_lb, flow)
 
-            loss += sim_loss_func(trg_lb, moved_lb)
+            loss_ = sim_loss_func(trg_lb, moved_lb)
+            if loss_ == False:
+                continue
+            loss += loss_
+            t += 1
 
-        return loss / (T - 1)
+        return loss / t
 
 
 model = Conv_All_Layers((256, 256))
@@ -380,6 +401,9 @@ with torch.no_grad():
     epoch_loss /= epoch_length
 
 # print epoch info
-msg = 'loss= %.4f, ' % epoch_loss
+if args.loss == 'dice':
+    msg = 'dice-score= %.4f, ' % epoch_loss
+else:
+    msg = 'mse= %.4e, ' % epoch_loss
 msg += 'time= %.4f ' % (time.time() - epoch_start_time)
 print(msg, flush=True)
