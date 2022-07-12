@@ -30,8 +30,8 @@ labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
-selected_organ = 2
-print("\nselected organ:", organs[selected_organ])
+SELECTED_ORGAN = 6
+print("\nselected organ:", organs[SELECTED_ORGAN])
 
 images = {}
 labels = {}
@@ -41,7 +41,7 @@ for i in range(30):
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
     lbl = labeled_images[i].get('label')[30:70, :, :]
-    lbl = np.where(lbl == selected_organ, np.ones_like(lbl), np.zeros_like(lbl))
+    lbl = np.where(lbl == SELECTED_ORGAN, np.ones_like(lbl), np.zeros_like(lbl))
     lbl = resize(lbl, (40, 256, 256), anti_aliasing=False)
     lbl = np.where(lbl > 0, np.ones_like(lbl), np.zeros_like(lbl))
     labels[id_] = lbl
@@ -56,6 +56,7 @@ class Args:
         self.bs = 1
         self.loss = 'dice'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/2d/0250.pt"
+        self.dis = 5
         self.int_steps = 7
         self.int_downsize = 2
 
@@ -124,13 +125,13 @@ with torch.no_grad():
         imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
         lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
-        for i in range((p_imgs.shape[0] - 1) // k):
+        for i in range((p_imgs.shape[0] - args.dis) // k):
             # shape = (bs, 1, W, H)
             moving_img = imgs[i * k: (i + 1) * k]
-            fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
+            fixed_img = imgs[i * k + args.dis: (i + 1) * k + args.dis]
 
             moving_lb = lbs[i * k: (i + 1) * k]
-            fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
+            fixed_lb = lbs[i * k + args.dis: (i + 1) * k + args.dis]
 
             # predict
             moved_img, flow = model(moving_img, fixed_img, registration=True)
@@ -145,7 +146,8 @@ with torch.no_grad():
             p_loss += loss * k
             p_slices += k
 
-        patients_loss.append((p_loss / p_slices).detach().cpu())
+        if p_slices != 0:
+            patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
 if args.loss == 'dice':

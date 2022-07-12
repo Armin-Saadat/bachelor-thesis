@@ -30,8 +30,8 @@ labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
-selected_organ = 6
-print("\nselected organ:", organs[selected_organ])
+SELECTED_ORGAN = 6
+print("\nselected organ:", organs[SELECTED_ORGAN])
 
 images = {}
 labels = {}
@@ -41,7 +41,7 @@ for i in range(30):
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
     lbl = labeled_images[i].get('label')[30:70, :, :]
-    lbl = np.where(lbl == selected_organ, np.ones_like(lbl), np.zeros_like(lbl))
+    lbl = np.where(lbl == SELECTED_ORGAN, np.ones_like(lbl), np.zeros_like(lbl))
     lbl = resize(lbl, (40, 256, 256), anti_aliasing=False)
     lbl = np.where(lbl > 0, np.ones_like(lbl), np.zeros_like(lbl))
     labels[id_] = lbl
@@ -56,6 +56,7 @@ class Args:
         self.bs = 1
         self.loss = 'dice'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/conv_all_layers/0250.pt"
+        self.dis = 5
         self.int_steps = 7
         self.int_downsize = 2
 
@@ -342,7 +343,7 @@ class Conv_All_Layers(nn.Module):
 
         loss = 0
         t = 0
-        for src_img, trg_img, src_lb, trg_lb in zip(images[:-1], images[1:], labels[:-1], labels[1:]):
+        for src_img, trg_img, src_lb, trg_lb in zip(images[:-args.dis], images[args.dis:], labels[:-args.dis], labels[args.dis:]):
             src_img = src_img.to(device).float()
             trg_img = trg_img.to(device).float()
             src_lb = src_lb.to(device).float()
