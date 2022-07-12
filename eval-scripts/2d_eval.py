@@ -56,7 +56,7 @@ class Args:
         self.bs = 1
         self.loss = 'dice'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/2d/0250.pt"
-        self.dis = 2
+        self.dis = 1
         self.int_steps = 7
         self.int_downsize = 2
 

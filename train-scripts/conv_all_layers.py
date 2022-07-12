@@ -36,15 +36,6 @@ for i in range(30):
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    lbl = labeled_images[i].get('label')[30:70, :, :]
-    print(lbl.shape)
-    print(len(np.unique(lbl)))
-    print("yo yooo")
-    lbl = resize(lbl, (40, 256, 256), anti_aliasing=False)
-    print(lbl.shape)
-    print(len(np.unique(lbl)))
-    exit()
-    
 for i in range(20):
     img = unlabeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
