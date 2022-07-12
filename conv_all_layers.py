@@ -31,11 +31,21 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 torch.autograd.set_detect_anomaly(True)
 
 images = {}
+labels = {}
 for i in range(30):
     img = labeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = labeled_images[i].get('id')
     images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    lbl = labeled_images[i].get('label')[30:70, :, :]
+    print(lbl.shape)
+    print(len(np.unique(lbl)))
+    print("yo yooo")
+    lbl = resize(lbl, (40, 256, 256), anti_aliasing=False)
+    print(lbl.shape)
+    print(len(np.unique(lbl)))
+    exit()
+    
 for i in range(20):
     img = unlabeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
@@ -54,15 +64,15 @@ number_of_patients = len(images)
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 300
+        self.epochs = 5
         self.bs = 1
         self.loss = 'mse'
-        self.load_model = False
+        self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/conv_all_layers/0250.pt"
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'test'
-        self.model_dir = './trained-models/new/' + self.run_name + '/'
+        self.run_name = 'test1'
+        self.model_dir = './trained-models/test/' + self.run_name + '/'
 
 
 args = Args()
@@ -344,8 +354,10 @@ class Conv_All_Layers(nn.Module):
 
 model = Conv_All_Layers((256, 256))
 if args.load_model:
+    print("loading model.")
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
+    print("model loaded successfully.")
 
 model.to(device)
 _ = model.train()
