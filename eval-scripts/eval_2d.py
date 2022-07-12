@@ -8,6 +8,8 @@ import imageio
 import pickle
 import random
 import torch
+import torch.nn as nn
+import torch.nn.functional as nnf
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from skimage.transform import resize
@@ -100,31 +102,33 @@ patients_loss = []
 evaluation_start_time = time.time()
 k = 1
 
-for p_id, p_imgs in images.items():
-    p_loss = 0
-    p_slices = 0
-    a = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
+with torch.no_grad():
+    for p_imgs, p_lbs in zip(images.values(), labels.values()):
+        p_loss = 0
+        p_slices = 0
+        imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
+        lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
-    for i in range((p_imgs.shape[0] - 1) // k):
-        # shape = (bs, 1, W, H)
-        moving_img = a[i * k: (i + 1) * k]
-        fixed_img = a[i * k + 1: (i + 1) * k + 1]
+        for i in range((p_imgs.shape[0] - 1) // k):
+            # shape = (bs, 1, W, H)
+            moving_img = imgs[i * k: (i + 1) * k]
+            fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
 
-        # predict
-        moved_img, flow = model(moving_img, fixed_img, registration=True)
+            moving_lb = imgs[i * k: (i + 1) * k]
+            fixed_lb = imgs[i * k + 1: (i + 1) * k + 1]
 
-        # calculate loss
-        loss = sim_loss_func(fixed_img, moved_img)
+            # predict
+            moved_img, flow = model(moving_img, fixed_img, registration=True)
 
-        # backpropagate and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            moved_lb = model.transformer(moving_lb, flow)
 
-        p_loss += loss * k
-        p_slices += k
+            # calculate loss
+            loss = sim_loss_func(fixed_lb, moved_lb)
 
-    patients_loss.append((p_loss / p_slices).detach().cpu())
+            p_loss += loss * k
+            p_slices += k
+
+        patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
 msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))

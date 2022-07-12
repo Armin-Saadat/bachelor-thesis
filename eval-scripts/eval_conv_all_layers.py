@@ -335,11 +335,6 @@ class Conv_All_Layers(nn.Module):
             flow = self.unet(h_state, 'decode', encoder_out_history)
             moved_lb = self.spatial_transformer(src_lb, flow)
 
-            # src_img.detach_()
-            # trg_img.detach_()
-            # src_lb.detach_()
-            # trg_lb.detach_()
-
             loss += sim_loss_func(trg_lb, moved_lb)
 
         return loss / (T - 1)
@@ -365,6 +360,7 @@ lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.value
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
+print("\nEvaluation started.")
 epoch_loss = 0
 epoch_length = 0
 epoch_start_time = time.time()
