@@ -70,15 +70,14 @@ class Dice:
     """
 
     def loss(self, y_true, y_pred):
-        print("Hi")
-        ndims = len(list(y_pred.size())) - 2
-        vol_axes = list(range(2, ndims + 2))
-        top = 2 * (y_true * y_pred).sum(dim=vol_axes)
-        bottom = torch.clamp((y_true + y_pred).sum(dim=vol_axes), min=1e-5)
-        dice = top / bottom
-        valid_slices_number = torch.sum(torch.where(dice == 0, torch.zeros_like(dice), torch.ones_like(dice)))
-        dice = torch.sum(dice) / valid_slices_number
-        return -dice
+        y_true = torch.where(y_true > 0, torch.ones_like(y_true), torch.zeros_like(y_true))
+        y_pred = torch.where(y_pred > 0, torch.ones_like(y_pred), torch.zeros_like(y_pred))
+        intersect = torch.sum(y_pred * y_true)
+        sum_ = torch.sum(y_true) + torch.sum(y_pred)
+        if sum_ == 0:
+            return False
+        dice = (2 * intersect) / sum_
+        return dice
 
 if args.loss == 'ncc':
     sim_loss_func = vxm.losses.NCC().loss
@@ -88,7 +87,6 @@ elif args.loss == 'dice':
     sim_loss_func = Dice().loss
 else:
     raise ValueError('loss should be "mse" or "ncc" or "dice", but found "%s"' % args.image_loss)
-
 
 # /////////////////////////////////////// model //////////////////////////////////////////
 
@@ -140,7 +138,9 @@ with torch.no_grad():
             moved_lb = model.transformer(moving_lb, flow)
 
             # calculate loss
-            loss = sim_loss_func(fixed_lb, fixed_lb)
+            loss = sim_loss_func(fixed_lb, moved_lb)
+            if loss == False:
+                continue
 
             p_loss += loss * k
             p_slices += k
@@ -148,6 +148,9 @@ with torch.no_grad():
         patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
-msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
+if args.loss == 'dice':
+    msg = 'dice-score= %.4f, ' % (sum(patients_loss) / len(patients_loss))
+else:
+    msg = 'mse= %.4e, ' % (sum(patients_loss) / len(patients_loss))
 msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
 print(msg, flush=True)
