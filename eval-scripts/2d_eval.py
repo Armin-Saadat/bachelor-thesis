@@ -30,7 +30,7 @@ labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
-SELECTED_ORGAN = 6
+SELECTED_ORGAN = 1
 print("\nselected organ:", organs[SELECTED_ORGAN])
 
 images = {}
@@ -56,7 +56,7 @@ class Args:
         self.bs = 1
         self.loss = 'dice'
         self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/2d/0250.pt"
-        self.dis = 5
+        self.dis = 2
         self.int_steps = 7
         self.int_downsize = 2
 
