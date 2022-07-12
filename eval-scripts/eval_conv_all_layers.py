@@ -31,7 +31,7 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
 selected_organ = 6
-print("selected organ:", organs[selected_organ])
+print("\nselected organ:", organs[selected_organ])
 
 images = {}
 labels = {}
@@ -342,7 +342,6 @@ class Conv_All_Layers(nn.Module):
 
 model = Conv_All_Layers((256, 256))
 if args.load_model:
-    print("loading model ...")
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
     print("model loaded successfully.")

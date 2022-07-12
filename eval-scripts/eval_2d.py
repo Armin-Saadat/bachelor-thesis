@@ -31,7 +31,7 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
 selected_organ = 6
-print("selected organ:", organs[selected_organ])
+print("\nselected organ:", organs[selected_organ])
 
 images = {}
 labels = {}
@@ -131,6 +131,6 @@ with torch.no_grad():
         patients_loss.append((p_loss / p_slices).detach().cpu())
 
 # print evaluation info
-msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
+msg = 'loss= %.4f, ' % (sum(patients_loss) / len(patients_loss))
 msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
 print(msg, flush=True)
