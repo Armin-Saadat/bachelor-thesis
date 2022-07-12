@@ -356,8 +356,10 @@ class Conv_All_Layers(nn.Module):
             if loss_ == False:
                 continue
             loss += loss_
-            t += 1
-
+            t += 1        
+    
+        if t == 0:
+            return False
         return loss / t
 
 
@@ -395,6 +397,8 @@ with torch.no_grad():
         # predict
         loss = model(input_img, input_lb)
 
+        if loss == False:
+            continue
         epoch_loss += loss * args.bs
         epoch_length += args.bs
 
