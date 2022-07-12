@@ -281,9 +281,9 @@ class RNNCell(nn.Module):
         return h_state, c_state
 
 
-class Conv_All_Layers(nn.Module):
+class Conv_Bottleneck(nn.Module):
     def __init__(self, image_size):
-        super(Conv_All_Layers, self).__init__()
+        super(Conv_Bottleneck, self).__init__()
         self.image_size = image_size
         self.ndims = len(image_size)
 
@@ -320,7 +320,7 @@ class Conv_All_Layers(nn.Module):
 
         return loss / (T - 1)
 
-model = Conv_All_Layers((256, 256))
+model = Conv_Bottleneck((256, 256))
 if args.load_model:
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
