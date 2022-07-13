@@ -18,6 +18,11 @@ pip install ./source-code/voxelmorph
 
 ## Train:
 
+Available Models:
+- **2d.py**: classic 2d U-Net
+- **fc_bottleneck.py**: 2d U-Net with Fully-Connected LSTM in the lowest layer
+- **conv_bottleneck.py**: 2d U-Net with Convolutional LSTM in the lowest layer
+- **conv_all_layers.py**: 2d U-Net with Convolutional LSTMs in all layers
 ```
 python3.7 train-scripts/<file-name>
 file-name options: 
