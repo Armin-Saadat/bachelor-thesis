@@ -21,6 +21,7 @@ pip install ./source-code/voxelmorph
 ```
 python3.7 train-scripts/<file-name>
 file-name options: [2d.py, fc_bottleneck.py, conv_bottleneck.py, conv_all_layers.py]
+In each file, there is an argument section specified with comments at Args. Using Args, you can set the hyper-parameters of the model and determine the path for saving and loading the trained models.
 ```
 
 ## Evaluate:
@@ -28,4 +29,7 @@ file-name options: [2d.py, fc_bottleneck.py, conv_bottleneck.py, conv_all_layers
 ```
 python3.7 eval-scripts/<file-name>
 file-name options: [2d_eval.py, fc_bottleneck_eval.py, conv_bottleneck_eval.py, conv_all_layers_eval.py]
+In each file, there is an argument section specified with comments at Args. Using Args, you can set the hyper-parameters of the model and determine the path for saving and loading the trained models.
 ```
+
+
