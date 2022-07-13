@@ -35,8 +35,12 @@ for i in range(0, 20):
     train_images.append(((img - img.min()) / (img.max() - img.min())).astype('float'))
     lb = labeled_images[i].get('label')[30:70, :, :]
     lb = resize(lb, (40, 256, 256), anti_aliasing=False)
-    train_labels.append(lb)
+    if lb.max() - lb.min() != 0:
+        train_labels.append(((lb - lb.min()) / (lb.max() - lb.min())).astype('float'))
+    else:
+        train_labels.append(lb.astype('float'))
 for i in range(20):
+    break
     img = unlabeled_images[i].get('image')[30:70, :, :]
     img = resize(img, (40, 256, 256), anti_aliasing=True)
     id_ = unlabeled_images[i].get('id')
@@ -51,7 +55,10 @@ for i in range(20, 30):
     test_images.append(((img - img.min()) / (img.max() - img.min())).astype('float'))
     lb = labeled_images[i].get('label')[30:70, :, :]
     lb = resize(lb, (40, 256, 256), anti_aliasing=False)
-    test_labels.append(lb)
+    if lb.max() - lb.min() != 0:
+        test_labels.append(((lb - lb.min()) / (lb.max() - lb.min())).astype('float'))
+    else:
+        test_labels.append(lb.astype('float'))
 
 print("\nData loaded successfully.")
 
@@ -60,12 +67,12 @@ print("\nData loaded successfully.")
 
 class Args:
     def __init__(self):
-        self.lr = 0.0005
+        self.lr = 0.001
         self.epochs = 50
         self.bs = 16
         self.loss = 'mse'
-        self.seg_w = 0.5
-        self.smooth_w = 0.1
+        self.seg_w = 0
+        self.smooth_w = 0
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
@@ -95,7 +102,7 @@ class OneDirDataset(Dataset):
     def __getitem__(self, index):
         img_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][0]])
         if self.data[index][1] is None:
-            lb_output = (None, None)
+            lb_output = (torch.zeros_like(img_output[0]), torch.zeros_like(img_output[0]))
         else:
             lb_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][1]])
 
@@ -115,7 +122,7 @@ elif args.loss == 'mse':
 else:
     raise ValueError('Image loss should be "mse" or "ncc", but found "%s"' % args.image_loss)
 
-smooth_loss_func = [vxm.losses.Grad('l2', loss_mult=args.int_downsize).loss]
+smooth_loss_func = vxm.losses.Grad('l2', loss_mult=args.int_downsize).loss
 seg_loss_func = vxm.losses.Dice().loss
 
 # /////////////////////////////////////// model //////////////////////////////////////////
@@ -169,7 +176,7 @@ for epoch in range(args.initial_epoch, args.epochs):
 
         # calculate loss
         sim_loss = sim_loss_func(fixed_img, moved_img)
-        if lbs[0] is None:
+        if lbs[0] is 0:
             seg_loss = 0
         else:
             [moving_lb, fixed_lb] = [d.to(device).float().permute(0, 3, 1, 2) for d in lbs]
@@ -198,7 +205,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
     msg += 'loss= %.4e, ' % (epoch_loss)
     msg += 'sim_loss= %.4e, ' % (epoch_sim_loss)
-    msg += 'seg_loss= %.4e, ' % (epoch_seg_loss)
+    msg += 'seg_loss= %.4f, ' % (epoch_seg_loss)
     msg += 'smooth_loss= %.4e, ' % (epoch_smooth_loss)
     msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
@@ -231,10 +238,6 @@ def evaluate(images, labels):
         p_loss = 0
         p_slices = 0
         imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
-        if p_lbs is None:
-            lbs = None
-        else:
-            lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
         for i in range((p_imgs.shape[0] - 1) // k):
             # shape = (bs, 1, W, H)
@@ -246,9 +249,10 @@ def evaluate(images, labels):
 
             # calculate loss
             sim_loss = sim_loss_func(fixed_img, moved_img)
-            if lbs is None:
+            if p_lbs is None:
                 seg_loss = 0
             else:
+                lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
                 moving_lb = lbs[i * k: (i + 1) * k]
                 fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
                 moved_lb = model.transformer(moving_lb, flow)
@@ -273,9 +277,9 @@ def evaluate(images, labels):
         patients_loss.append((p_loss / p_slices).detach().cpu())
 
     # print evaluation info
-    msg += 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
+    msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
     msg += 'sim_loss= %.4e, ' % (sum(patients_sim_loss) / len(patients_sim_loss))
-    msg += 'seg_loss= %.4e, ' % (sum(patients_seg_loss) / len(patients_seg_loss))
+    msg += 'seg_loss= %.4f, ' % (sum(patients_seg_loss) / len(patients_seg_loss))
     msg += 'smooth_loss= %.4e, ' % (sum(patients_smooth_loss) / len(patients_smooth_loss))
     msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
     print(msg, flush=True)
