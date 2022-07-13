@@ -99,7 +99,7 @@ class OneDirDataset(Dataset):
         else:
             lb_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][1]])
 
-        return tuple(img_output, lb_output)
+        return (img_output, lb_output)
 
 train_dataset = OneDirDataset(train_images, train_labels, dis=1)
 train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
