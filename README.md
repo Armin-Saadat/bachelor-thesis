@@ -32,7 +32,7 @@ file-name options:
 [2d_eval.py, fc_bottleneck_eval.py, conv_bottleneck_eval.py, conv_all_layers_eval.py]
 ```
 
-
+####
 In each file, there is an argument section specified with comments at Args. Using Args, you can set the hyper-parameters of the model and determine the path for saving and loading the trained models.
 
 
