@@ -11,6 +11,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
 from skimage.transform import resize
+from collections import Counter
 
 os.environ['VXM_BACKEND'] = 'pytorch'
 os.environ['NEURITE_BACKEND'] = 'pytorch'
@@ -68,8 +69,8 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 50
-        self.bs = 16
+        self.epochs = 1
+        self.bs = 1
         self.loss = 'mse'
         self.seg_w = 0
         self.smooth_w = 0
@@ -152,11 +153,12 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 # ///////////////////////////////////// train ////////////////////////////////////////////
 
 loss_history = []
+dice_scores = []
 
 for epoch in range(args.initial_epoch, args.epochs):
 
     # save model checkpoint
-    if (epoch + 1) % 10 == 0:
+    if (epoch + 1) % 50 == 0:
         model.save(os.path.join(args.model_dir, '%04d.pt' % epoch))
 
     epoch_sim_loss = 0
@@ -184,6 +186,8 @@ for epoch in range(args.initial_epoch, args.epochs):
             seg_loss = seg_loss_func(fixed_lb, moved_lb)
         smooth_loss = smooth_loss_func(_, flow)
         loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+
+        dice_scores.append(-seg_loss)
 
         # backpropagate and optimize
         optimizer.zero_grad()
@@ -220,6 +224,13 @@ plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
+
+print(Counter(words).items())
+print("------------------------------------------------------------------")
+print(Counter(words).keys())
+print(Counter(words).values())
+
+
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
