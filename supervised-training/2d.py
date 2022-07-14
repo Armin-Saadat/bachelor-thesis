@@ -39,7 +39,8 @@ for i in range(0, 20):
     if lb.max() - lb.min() != 0:
         train_labels.append(((lb - lb.min()) / (lb.max() - lb.min())).astype('float'))
     else:
-        train_labels.append(lb.astype('float'))
+        train_images.pop()
+#        train_labels.append(lb.astype('float'))
 for i in range(20):
     break
     img = unlabeled_images[i].get('image')[30:70, :, :]
@@ -69,7 +70,7 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 1
+        self.epochs = 30
         self.bs = 1
         self.loss = 'mse'
         self.seg_w = 0
@@ -153,9 +154,9 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 # ///////////////////////////////////// train ////////////////////////////////////////////
 
 loss_history = []
-dice_scores = []
 
 for epoch in range(args.initial_epoch, args.epochs):
+    dice_scores = []
 
     # save model checkpoint
     if (epoch + 1) % 50 == 0:
@@ -187,7 +188,7 @@ for epoch in range(args.initial_epoch, args.epochs):
         smooth_loss = smooth_loss_func(_, flow)
         loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
 
-        dice_scores.append(-seg_loss)
+        dice_scores.append(-seg_loss.detach().cpu().numpy())
 
         # backpropagate and optimize
         optimizer.zero_grad()
@@ -204,6 +205,13 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_seg_loss /= epoch_length
     epoch_smooth_loss /= epoch_length
     epoch_loss /= epoch_length
+
+    a = []
+    for d in dice_scores:
+        if d != 0:
+            a.append(d)
+    print(len(a))
+    print(sum(a) / len(a))
 
     # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
@@ -225,10 +233,12 @@ plt.ylabel('loss')
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
 
-print(Counter(words).items())
-print("------------------------------------------------------------------")
-print(Counter(words).keys())
-print(Counter(words).values())
+a = []
+for d in dice_scores:
+    if d != 0:
+        a.append(d)
+print(len(a))
+print(sum(a) / len(a))
 
 
 
