@@ -27,6 +27,7 @@ torch.backends.cudnn.deterministic = True
 
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
+unlabeled_images_starts = [55, 60, 100, 40, 40, 80, 80, 75, 95, 55, 100, 50, 45, 45, 110, 60, 65, 55, 45, 95]
 
 train_images = []
 train_labels = []
@@ -52,6 +53,13 @@ for i in range(0, 30):
                 test_images.append(img)
                 test_labels.append(lb)
             break
+for i in range(0, 20):
+    s = unlabeled_images_starts[i]
+    img = unlabeled_images[i].get('image')[s:s + 25, :, :]
+    img = resize(img, (25, 256, 256), anti_aliasing=True)
+    img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    train_images.append(img)
+    train_labels.append(np.zeros_like(img))
 print("\nData loaded successfully.")
 
 
@@ -61,7 +69,7 @@ class Args:
     def __init__(self):
         self.lr = 0.0005
         self.epochs = 100
-        self.bs = 16
+        self.bs = 24
         self.loss = 'mse'
         self.seg_w = 0.5
         self.smooth_w = 0.01
@@ -74,6 +82,8 @@ class Args:
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)
+
+assert args.bs == 24, "batch-size must be equal to number of pairs per patient."
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
@@ -98,7 +108,7 @@ class OneDirDataset(Dataset):
         return img_output, lb_output
 
 train_dataset = OneDirDataset(train_images, train_labels, dis=1)
-train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
+train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False, pin_memory=False,num_workers=0)
 
 test_dataset = OneDirDataset(test_images, test_labels, dis=1)
 # test_dataloader = DataLoader(test_dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
@@ -156,6 +166,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_smooth_loss = 0
     epoch_loss = 0
     epoch_length = 0
+    epoch_seg_count = 0
     epoch_start_time = time.time()
 
     for inputs in train_dataloader:
@@ -172,7 +183,13 @@ for epoch in range(args.initial_epoch, args.epochs):
         sim_loss = sim_loss_func(fixed_img, moved_img)
         seg_loss = seg_loss_func(fixed_lb, moved_lb)
         smooth_loss = smooth_loss_func(_, flow)
-        loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+
+        if moving_lb.max() == 0:
+            loss = sim_loss + args.smooth_w * smooth_loss
+        else:
+            loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+            epoch_seg_loss += seg_loss * args.bs
+            epoch_seg_count += args.bs
 
         # backpropagate and optimize
         optimizer.zero_grad()
@@ -180,13 +197,12 @@ for epoch in range(args.initial_epoch, args.epochs):
         optimizer.step()
 
         epoch_sim_loss += sim_loss * args.bs
-        epoch_seg_loss += seg_loss * args.bs
         epoch_smooth_loss += smooth_loss * args.bs
         epoch_loss += loss * args.bs
         epoch_length += args.bs
 
     epoch_sim_loss /= epoch_length
-    epoch_seg_loss /= epoch_length
+    epoch_seg_loss /= epoch_seg_count
     epoch_smooth_loss /= epoch_length
     epoch_loss /= epoch_length
 
@@ -207,14 +223,15 @@ for epoch in range(args.initial_epoch, args.epochs):
 # final model save
 model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 
-plt.plot(range(len(loss_history)), loss_history, "-b", label="loss")
-plt.plot(range(len(loss_history)), sim_loss_history, "-r", label="sim-loss")
-plt.plot(range(len(loss_history)), seg_loss_history, "-g", label="seg-loss")
-plt.plot(range(len(loss_history)), smooth_loss_history, "-c", label="smooth-loss")
-plt.legend(loc="upper left")
-plt.ylim(-1.5, 2.0)
-plt.xlabel('epoch')
-plt.ylabel('loss')
+figure, axis = plt.subplots(1, 4, figsize=(60, 15))
+axis[0].plot(loss_history)
+axis[0].set_title("Final Loss")
+axis[1].plot(sim_loss_history)
+axis[1].set_title("Similarity Loss")
+axis[2].plot(seg_loss_history)
+axis[2].set_title("Segmentation Loss")
+axis[3].plot(smooth_loss_history)
+axis[3].set_title("Smooth Loss")
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
 
@@ -228,47 +245,47 @@ def evaluate(images, labels):
     evaluation_start_time = time.time()
     k = 1
 
-    for p_imgs, p_lbs in zip(images, labels):
-        p_sim_loss = 0
-        p_seg_loss = 0
-        p_smooth_loss = 0
-        p_loss = 0
-        p_slices = 0
-        imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
-        lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
+    with torch.no_grad():
+        for p_imgs, p_lbs in zip(images, labels):
+            p_sim_loss = 0
+            p_seg_loss = 0
+            p_smooth_loss = 0
+            p_loss = 0
+            p_slices = 0
+            imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
+            lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
-        for i in range((p_imgs.shape[0] - 1) // k):
-            # shape = (bs, 1, W, H)
-            moving_img = imgs[i * k: (i + 1) * k]
-            fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
-            moving_lb = lbs[i * k: (i + 1) * k]
-            fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
+            for i in range((p_imgs.shape[0] - 1) // k):
+                # shape = (bs, 1, W, H)
+                moving_img = imgs[i * k: (i + 1) * k]
+                fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
+                moving_lb = lbs[i * k: (i + 1) * k]
+                fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
 
-            # predict
-            moved_img, flow = model(moving_img, fixed_img, registration=True)
-            moved_lb = model.transformer(moving_lb, flow)
+                # predict
+                moved_img, flow = model(moving_img, fixed_img, registration=True)
+                moved_lb = model.transformer(moving_lb, flow)
 
-            # calculate loss
-            sim_loss = sim_loss_func(fixed_img, moved_img)
-            seg_loss = seg_loss_func(fixed_lb, moved_lb)
-            smooth_loss = smooth_loss_func(_, flow)
-            loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+                # calculate loss
+                sim_loss = sim_loss_func(fixed_img, moved_img)
+                seg_loss = seg_loss_func(fixed_lb, moved_lb)
+                smooth_loss = smooth_loss_func(_, flow)
+                if moving_lb.max() == 0:
+                    loss = sim_loss + args.smooth_w * smooth_loss
+                else:
+                    loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
 
-            # backpropagate and optimize
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                p_sim_loss += sim_loss * k
+                p_seg_loss += seg_loss * k
+                p_smooth_loss += smooth_loss * k
+                p_loss += loss * k
+                p_slices += k
 
-            p_sim_loss += sim_loss * k
-            p_seg_loss += seg_loss * k
-            p_smooth_loss += smooth_loss * k
-            p_loss += loss * k
-            p_slices += k
-
-        patients_sim_loss.append((p_sim_loss / p_slices).detach().cpu())
-        patients_seg_loss.append((p_seg_loss / p_slices).detach().cpu())
-        patients_smooth_loss.append((p_smooth_loss / p_slices).detach().cpu())
-        patients_loss.append((p_loss / p_slices).detach().cpu())
+            patients_sim_loss.append((p_sim_loss / p_slices).detach().cpu())
+            if p_imgs.max() > 0:
+                patients_seg_loss.append((p_seg_loss / p_slices).detach().cpu())
+            patients_smooth_loss.append((p_smooth_loss / p_slices).detach().cpu())
+            patients_loss.append((p_loss / p_slices).detach().cpu())
 
     # print evaluation info
     msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
