@@ -68,16 +68,16 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 100
+        self.epochs = 3
         self.bs = 24
         self.loss = 'mse'
-        self.seg_w = 0.5
+        self.seg_w = 0.1
         self.smooth_w = 0.01
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_supervised_2'
+        self.run_name = '2d_supervised_0.1_0.01'
         self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/' + self.run_name + '/'
 
 args = Args()
@@ -279,7 +279,7 @@ def evaluate(images, labels):
                 p_slices += k
 
             patients_sim_loss.append((p_sim_loss / p_slices).detach().cpu())
-            if p_imgs.max() > 0:
+            if p_seg_loss != 0:
                 patients_seg_loss.append((p_seg_loss / p_slices).detach().cpu())
             patients_smooth_loss.append((p_smooth_loss / p_slices).detach().cpu())
             patients_loss.append((p_loss / p_slices).detach().cpu())
