@@ -110,9 +110,6 @@ class OneDirDataset(Dataset):
 train_dataset = OneDirDataset(train_images, train_labels, dis=1)
 train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=False, pin_memory=False,num_workers=0)
 
-test_dataset = OneDirDataset(test_images, test_labels, dis=1)
-# test_dataloader = DataLoader(test_dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
-
 # ///////////////////////////////////// loss ////////////////////////////////////////////
 if args.loss == 'ncc':
     sim_loss_func = vxm.losses.NCC().loss
