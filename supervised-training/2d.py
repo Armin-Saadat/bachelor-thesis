@@ -30,38 +30,28 @@ unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/syna
 
 train_images = []
 train_labels = []
-for i in range(0, 20):
-    img = labeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
-    train_images.append(((img - img.min()) / (img.max() - img.min())).astype('float'))
-    lb = labeled_images[i].get('label')[30:70, :, :]
-    lb = resize(lb, (40, 256, 256), anti_aliasing=False)
-    if lb.max() - lb.min() != 0:
-        train_labels.append(((lb - lb.min()) / (lb.max() - lb.min())).astype('float'))
-    else:
-        train_images.pop()
-#        train_labels.append(lb.astype('float'))
-for i in range(20):
-    break
-    img = unlabeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
-    id_ = unlabeled_images[i].get('id')
-    train_images.append(((img - img.min()) / (img.max() - img.min())).astype('float'))
-    train_labels.append(None)
-
 test_images = []
 test_labels = []
-for i in range(20, 30):
-    img = labeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
-    test_images.append(((img - img.min()) / (img.max() - img.min())).astype('float'))
-    lb = labeled_images[i].get('label')[30:70, :, :]
-    lb = resize(lb, (40, 256, 256), anti_aliasing=False)
-    if lb.max() - lb.min() != 0:
-        test_labels.append(((lb - lb.min()) / (lb.max() - lb.min())).astype('float'))
-    else:
-        test_labels.append(lb.astype('float'))
-
+for i in range(0, 30):
+    if i == 3 or i == 8:
+        continue
+    lb = labeled_images[i].get('label')
+    for j in range(lb.shape[0]):
+        if 6 in lb[j, :, :]:
+            lb = lb[j + 5:j + 30, :, :]
+            lb = np.where(lb == 6, np.ones_like(lb), np.zeros_like(lb))
+            lb = resize(lb, (25, 256, 256), anti_aliasing=False)
+            lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
+            img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
+            img = resize(img, (25, 256, 256), anti_aliasing=True)
+            img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+            if i < 20:
+                train_images.append(img)
+                train_labels.append(lb)
+            else:
+                test_images.append(img)
+                test_labels.append(lb)
+            break
 print("\nData loaded successfully.")
 
 
@@ -70,11 +60,11 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 30
-        self.bs = 1
+        self.epochs = 50
+        self.bs = 16
         self.loss = 'mse'
-        self.seg_w = 0
-        self.smooth_w = 0
+        self.seg_w = 0.1
+        self.smooth_w = 0.01
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
@@ -103,12 +93,9 @@ class OneDirDataset(Dataset):
 
     def __getitem__(self, index):
         img_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][0]])
-        if self.data[index][1] is None:
-            lb_output = (torch.zeros_like(img_output[0]), torch.zeros_like(img_output[0]))
-        else:
-            lb_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][1]])
+        lb_output = tuple([torch.tensor(d).unsqueeze(-1) for d in self.data[index][1]])
 
-        return (img_output, lb_output)
+        return img_output, lb_output
 
 train_dataset = OneDirDataset(train_images, train_labels, dis=1)
 train_dataloader = DataLoader(train_dataset, batch_size=args.bs, shuffle=True, pin_memory=False,num_workers=0)
@@ -154,9 +141,11 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 # ///////////////////////////////////// train ////////////////////////////////////////////
 
 loss_history = []
+sim_loss_history = []
+seg_loss_history = []
+smooth_loss_history = []
 
 for epoch in range(args.initial_epoch, args.epochs):
-    dice_scores = []
 
     # save model checkpoint
     if (epoch + 1) % 50 == 0:
@@ -173,22 +162,17 @@ for epoch in range(args.initial_epoch, args.epochs):
         # shape = (bs, 1, W, H)
         imgs , lbs = inputs
         [moving_img, fixed_img] = [d.to(device).float().permute(0, 3, 1, 2) for d in imgs]
+        [moving_lb, fixed_lb] = [d.to(device).float().permute(0, 3, 1, 2) for d in lbs]
 
         # predict
         moved_img, flow = model(moving_img, fixed_img, registration=True)
+        moved_lb = model.transformer(moving_lb, flow)
 
         # calculate loss
         sim_loss = sim_loss_func(fixed_img, moved_img)
-        if lbs[0] is 0:
-            seg_loss = 0
-        else:
-            [moving_lb, fixed_lb] = [d.to(device).float().permute(0, 3, 1, 2) for d in lbs]
-            moved_lb = model.transformer(moving_lb, flow)
-            seg_loss = seg_loss_func(fixed_lb, moved_lb)
+        seg_loss = seg_loss_func(fixed_lb, moved_lb)
         smooth_loss = smooth_loss_func(_, flow)
         loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
-
-        dice_scores.append(-seg_loss.detach().cpu().numpy())
 
         # backpropagate and optimize
         optimizer.zero_grad()
@@ -206,13 +190,6 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_smooth_loss /= epoch_length
     epoch_loss /= epoch_length
 
-    a = []
-    for d in dice_scores:
-        if d != 0:
-            a.append(d)
-    print(len(a))
-    print(sum(a) / len(a))
-
     # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
     msg += 'loss= %.4e, ' % (epoch_loss)
@@ -223,24 +200,23 @@ for epoch in range(args.initial_epoch, args.epochs):
     print(msg, flush=True)
 
     loss_history.append(epoch_loss.detach().cpu())
+    sim_loss_history.append(epoch_sim_loss.detach().cpu())
+    seg_loss_history.append(epoch_seg_loss.detach().cpu())
+    smooth_loss_history.append(epoch_smooth_loss.detach().cpu())
 
 # final model save
 model.save(os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 
-plt.plot(loss_history)
+plt.plot(range(len(loss_history)), loss_history, "-b", label="loss")
+plt.plot(range(len(loss_history)), sim_loss_history, "-r", label="sim-loss")
+plt.plot(range(len(loss_history)), seg_loss_history, "-g", label="seg-loss")
+plt.plot(range(len(loss_history)), smooth_loss_history, "-c", label="smooth-loss")
+plt.legend(loc="upper left")
+plt.ylim(-1.5, 2.0)
 plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
-
-a = []
-for d in dice_scores:
-    if d != 0:
-        a.append(d)
-print(len(a))
-print(sum(a) / len(a))
-
-
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
 
@@ -259,25 +235,22 @@ def evaluate(images, labels):
         p_loss = 0
         p_slices = 0
         imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
+        lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
         for i in range((p_imgs.shape[0] - 1) // k):
             # shape = (bs, 1, W, H)
             moving_img = imgs[i * k: (i + 1) * k]
             fixed_img = imgs[i * k + 1: (i + 1) * k + 1]
+            moving_lb = lbs[i * k: (i + 1) * k]
+            fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
 
             # predict
             moved_img, flow = model(moving_img, fixed_img, registration=True)
+            moved_lb = model.transformer(moving_lb, flow)
 
             # calculate loss
             sim_loss = sim_loss_func(fixed_img, moved_img)
-            if p_lbs is None:
-                seg_loss = 0
-            else:
-                lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
-                moving_lb = lbs[i * k: (i + 1) * k]
-                fixed_lb = lbs[i * k + 1: (i + 1) * k + 1]
-                moved_lb = model.transformer(moving_lb, flow)
-                seg_loss = seg_loss_func(fixed_lb, moved_lb)
+            seg_loss = seg_loss_func(fixed_lb, moved_lb)
             smooth_loss = smooth_loss_func(_, flow)
             loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
 
