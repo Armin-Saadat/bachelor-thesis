@@ -71,8 +71,8 @@ class Args:
         self.epochs = 50
         self.bs = 24
         self.loss = 'mse'
-        self.seg_w = 0.1
-        self.smooth_w = 0.01
+        self.seg_w = 0.001
+        self.smooth_w = 0.0
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
