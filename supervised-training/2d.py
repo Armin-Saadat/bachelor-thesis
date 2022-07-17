@@ -59,17 +59,17 @@ print("\nData loaded successfully.")
 
 class Args:
     def __init__(self):
-        self.lr = 0.001
-        self.epochs = 50
+        self.lr = 0.0005
+        self.epochs = 100
         self.bs = 16
         self.loss = 'mse'
-        self.seg_w = 0.1
+        self.seg_w = 0.5
         self.smooth_w = 0.01
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_supervised'
+        self.run_name = '2d_supervised_2'
         self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/' + self.run_name + '/'
 
 args = Args()
