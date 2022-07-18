@@ -68,7 +68,7 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.0005
-        self.epochs = 5
+        self.epochs = 3
         self.bs = 1
         self.loss = 'mse'
         self.seg_w = 0.001
@@ -77,8 +77,8 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'test1'
-        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/test/' + self.run_name + '/'
+        self.run_name = 'conv_all_test'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/' + self.run_name + '/'
 
 
 args = Args()
@@ -383,8 +383,8 @@ print('number of trainable params:', sum(p.numel() for p in model.parameters() i
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-train_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_images.values()]
-train_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_labels.values()]
+train_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_images]
+train_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_labels]
 
 
 # ///////////////////////////////////// train ////////////////////////////////////////////
@@ -428,7 +428,7 @@ for epoch in range(args.initial_epoch, args.epochs):
         epoch_loss += loss * args.bs
         epoch_sim_loss += sim_loss * args.bs
         if seg_loss != 0:
-            epoch_seg_loss += loss * args.bs
+            epoch_seg_loss += seg_loss * args.bs
             epoch_seg_count += args.bs
         epoch_smooth_loss += smooth_loss * args.bs
         epoch_length += args.bs
