@@ -77,8 +77,8 @@ class Args:
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_supervised_0.1_0.01_bs24_no_shuffle_all'
-        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/' + self.run_name + '/'
+        self.run_name = '2d_0.1_0.01'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)

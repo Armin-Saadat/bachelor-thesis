@@ -383,11 +383,9 @@ print('number of trainable params:', sum(p.numel() for p in model.parameters() i
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
+# ///////////////////////////////////// train ////////////////////////////////////////////
 train_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_images]
 train_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_labels]
-
-
-# ///////////////////////////////////// train ////////////////////////////////////////////
 
 loss_history = []
 sim_loss_history = []
@@ -468,3 +466,48 @@ axis[3].plot(smooth_loss_history)
 axis[3].set_title("Smooth Loss")
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
+
+# ///////////////////////////////////// evaluate ////////////////////////////////////////////
+test_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_images]
+test_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_labels]
+
+with torch.no_grad():
+    epoch_loss = 0
+    epoch_sim_loss = 0
+    epoch_seg_loss = 0
+    epoch_smooth_loss = 0
+    epoch_length = 0
+    epoch_seg_count = 0
+    epoch_start_time = time.time()
+
+    for k in range(len(test_images) // args.bs):
+        # shape of input = (T, bs, 1, W, H)
+        input_img = torch.cat(test_imgs[k:k + args.bs], dim=1).to(device).float()
+        input_lb = torch.cat(test_lbs[k:k + args.bs], dim=1).to(device).float()
+        k += args.bs
+
+        # predict
+        sim_loss, seg_loss, smooth_loss = model(input_img, input_lb)
+        loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+
+        epoch_loss += loss * args.bs
+        epoch_sim_loss += sim_loss * args.bs
+        if seg_loss != 0:
+            epoch_seg_loss += seg_loss * args.bs
+            epoch_seg_count += args.bs
+        epoch_smooth_loss += smooth_loss * args.bs
+        epoch_length += args.bs
+
+    epoch_loss /= epoch_length
+    epoch_sim_loss /= epoch_length
+    epoch_seg_loss /= epoch_seg_count
+    epoch_smooth_loss /= epoch_length
+
+    # print epoch info
+    print('\nEvaluation started:')
+    msg = 'loss= %.4e, ' % epoch_loss
+    msg += 'sim_loss= %.4e, ' % epoch_sim_loss
+    msg += 'seg_loss= %.4f, ' % epoch_seg_loss
+    msg += 'smooth_loss= %.4e, ' % epoch_smooth_loss
+    msg += 'time= %.4f ' % (time.time() - epoch_start_time)
+    print(msg, flush=True)
