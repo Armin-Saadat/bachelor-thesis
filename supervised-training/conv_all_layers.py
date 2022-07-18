@@ -363,6 +363,7 @@ class Conv_All_Layers(nn.Module):
             if src_lb.max() != 0:
                 seg_loss += seg_loss_func(trg_lb, moved_lb)
                 labeled_slices_count += 1
+
         if labeled_slices_count == 0:
             return  sim_loss / (T - 1), 0, smooth_loss / (T - 1)
         else:
