@@ -67,8 +67,8 @@ print("\nData loaded successfully.")
 
 class Args:
     def __init__(self):
-        self.lr = 0.0005
-        self.epochs = 3
+        self.lr = 0.001
+        self.epochs = 1
         self.bs = 1
         self.loss = 'mse'
         self.seg_w = 0.001
@@ -311,13 +311,13 @@ class FC_Bottleneck(nn.Module):
 
         # shape of flow: (T-1, bs, 2, 256, 256)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T-1)]
-        flow = torch.cat(Y, dim=0)
+        flows = torch.cat(Y, dim=0)
 
         sim_loss = 0
         seg_loss = 0
         labeled_slices_count = 0
         smooth_loss = 0
-        for src_img, trg_img, src_lb, trg_lb in zip(images[:-1], images[1:], labels[:-1], labels[1:]):
+        for src_img, trg_img, src_lb, trg_lb, flow in zip(images[:-1], images[1:], labels[:-1], labels[1:], flows):
             moved_img = self.spatial_transformer(src_img, flow)
             moved_lb = self.spatial_transformer(src_lb, flow)
 
