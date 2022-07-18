@@ -504,7 +504,7 @@ with torch.no_grad():
     epoch_smooth_loss /= epoch_length
 
     # print epoch info
-    print('\nEvaluation started:')
+    print('\nEvaluation results on test dataset:')
     msg = 'loss= %.4e, ' % epoch_loss
     msg += 'sim_loss= %.4e, ' % epoch_sim_loss
     msg += 'seg_loss= %.4f, ' % epoch_seg_loss
