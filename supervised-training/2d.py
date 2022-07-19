@@ -38,7 +38,7 @@ test_images = []
 test_labels = []
 for i in range(0, 20):
     imgs = labeled_images[i].get('image')
-    for j in range(imgs.shape[0] - 30 // 5):
+    for j in range((imgs.shape[0] - 30) // 5):
         img = imgs[j*5: j*5 + 25, :, :]
         img = resize(img, (25, 256, 256), anti_aliasing=True)
         img = ((img - img.min()) / (img.max() - img.min())).astype('float')
@@ -53,6 +53,7 @@ for i in range(0, 20):
         train_images.append(img)
         train_labels.append(np.zeros_like(img))
 print("\nData loaded successfully.")
+print("number of patients:", len(train_images)) 
 
 
 # train_images = []
@@ -94,17 +95,17 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 50
+        self.epochs = 1
         self.bs = 24
         self.loss = 'mse'
-        self.seg_w = 0.001
+        self.seg_w = 0.0
         self.smooth_w = 0.0
         self.load_model = False
         self.initial_epoch = 0
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = '2d_0.1_0.01'
-        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/' + self.run_name + '/'
+        self.run_name = 'pre_train'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/unet/' + self.run_name + '/'
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)
