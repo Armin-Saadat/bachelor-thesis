@@ -46,7 +46,7 @@ for i in range(0, 20):
         train_labels.append(np.zeros_like(img))
 for i in range(0, 20):
     imgs = unlabeled_images[i].get('image')
-    for j in range(imgs.shape[0] - 30 // 5):
+    for j in range((imgs.shape[0] - 30) // 5):
         img = imgs[j*5: j*5 + 25, :, :]
         img = resize(img, (25, 256, 256), anti_aliasing=True)
         img = ((img - img.min()) / (img.max() - img.min())).astype('float')
