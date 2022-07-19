@@ -38,16 +38,16 @@ test_images = []
 test_labels = []
 for i in range(0, 20):
     imgs = labeled_images[i].get('image')
-    for j in range((imgs.shape[0] - 30) // 5):
-        img = imgs[j*5: j*5 + 25, :, :]
+    for j in range((imgs.shape[0] - 30) // 25):
+        img = imgs[j*25: j*25 + 25, :, :]
         img = resize(img, (25, 256, 256), anti_aliasing=True)
         img = ((img - img.min()) / (img.max() - img.min())).astype('float')
         train_images.append(img)
         train_labels.append(np.zeros_like(img))
 for i in range(0, 20):
     imgs = unlabeled_images[i].get('image')
-    for j in range((imgs.shape[0] - 30) // 5):
-        img = imgs[j*5: j*5 + 25, :, :]
+    for j in range((imgs.shape[0] - 30) // 25):
+        img = imgs[j*25: j*25 + 25, :, :]
         img = resize(img, (25, 256, 256), anti_aliasing=True)
         img = ((img - img.min()) / (img.max() - img.min())).astype('float')
         train_images.append(img)
@@ -95,8 +95,8 @@ print("number of training subjects:", len(train_images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 1
-        self.bs = 24
+        self.epochs = 250
+        self.bs = 100
         self.loss = 'mse'
         self.seg_w = 0.0
         self.smooth_w = 0.0
@@ -110,7 +110,7 @@ class Args:
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)
 
-assert args.bs == 24, "batch-size must be equal to number of pairs per patient."
+#assert args.bs == 24, "batch-size must be equal to number of pairs per patient."
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
@@ -226,7 +226,10 @@ for epoch in range(args.initial_epoch, args.epochs):
         epoch_length += args.bs
 
     epoch_sim_loss /= epoch_length
-    epoch_seg_loss /= epoch_seg_count
+    if epoch_seg_count != 0:
+        epoch_seg_loss /= epoch_seg_count
+    else:
+        epoch_seg_loss = torch.tensor(0)
     epoch_smooth_loss /= epoch_length
     epoch_loss /= epoch_length
 
@@ -276,6 +279,7 @@ def evaluate(images, labels):
             p_smooth_loss = 0
             p_loss = 0
             p_slices = 0
+            p_slices_seg = 0
             imgs = torch.tensor(p_imgs).unsqueeze(1).to(device).float()
             lbs = torch.tensor(p_lbs).unsqueeze(1).to(device).float()
 
@@ -298,19 +302,22 @@ def evaluate(images, labels):
                     loss = sim_loss + args.smooth_w * smooth_loss
                 else:
                     loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+                    p_seg_loss += seg_loss * k
+                    p_slices_seg += k
 
                 p_sim_loss += sim_loss * k
-                p_seg_loss += seg_loss * k
                 p_smooth_loss += smooth_loss * k
                 p_loss += loss * k
                 p_slices += k
 
             patients_sim_loss.append((p_sim_loss / p_slices).detach().cpu())
-            if p_seg_loss != 0:
-                patients_seg_loss.append((p_seg_loss / p_slices).detach().cpu())
+            if p_slices_seg != 0:
+                patients_seg_loss.append((p_seg_loss / p_slices_seg).detach().cpu())
             patients_smooth_loss.append((p_smooth_loss / p_slices).detach().cpu())
             patients_loss.append((p_loss / p_slices).detach().cpu())
 
+    if len(patients_seg_loss) == 0:
+        patients_seg_loss.append(0)
     # print evaluation info
     msg = 'loss= %.4e, ' % (sum(patients_loss) / len(patients_loss))
     msg += 'sim_loss= %.4e, ' % (sum(patients_sim_loss) / len(patients_sim_loss))
@@ -319,8 +326,8 @@ def evaluate(images, labels):
     msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
     print(msg, flush=True)
 
-print("\nEvaluation for training-set started.")
-evaluate(train_images, train_labels)
+#print("\nEvaluation for training-set started.")
+#evaluate(train_images, train_labels)
 
-print("\nEvaluation for test-set started.")
-evaluate(test_images, test_labels)
+#print("\nEvaluation for test-set started.")
+#evaluate(test_images, test_labels)
