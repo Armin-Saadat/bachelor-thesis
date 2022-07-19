@@ -25,6 +25,9 @@ torch.backends.cudnn.deterministic = True
 torch.autograd.set_detect_anomaly(True)
 
 # ////////////////////////////////////////// load & normalize ///////////////////////////////////////
+organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"aorta", 11:"pancreas"}
+SELECTED_ORGAN = 6
+print("\nselected organ:", organs[SELECTED_ORGAN])
 
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
@@ -41,7 +44,7 @@ for i in range(0, 30):
     for j in range(lb.shape[0]):
         if 6 in lb[j, :, :]:
             lb = lb[j + 5:j + 30, :, :]
-            lb = np.where(lb == 6, np.ones_like(lb), np.zeros_like(lb))
+            lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
             lb = resize(lb, (25, 256, 256), anti_aliasing=False)
             lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
             img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
