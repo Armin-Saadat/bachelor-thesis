@@ -36,34 +36,57 @@ train_images = []
 train_labels = []
 test_images = []
 test_labels = []
-for i in range(0, 30):
-    if i == 3 or i == 8:
-        continue
-    lb = labeled_images[i].get('label')
-    for j in range(lb.shape[0]):
-        if 6 in lb[j, :, :]:
-            lb = lb[j + 5:j + 30, :, :]
-            lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
-            lb = resize(lb, (25, 256, 256), anti_aliasing=False)
-            lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
-            img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
-            img = resize(img, (25, 256, 256), anti_aliasing=True)
-            img = ((img - img.min()) / (img.max() - img.min())).astype('float')
-            if i < 20:
-                train_images.append(img)
-                train_labels.append(lb)
-            else:
-                test_images.append(img)
-                test_labels.append(lb)
-            break
 for i in range(0, 20):
-    s = unlabeled_images_starts[i]
-    img = unlabeled_images[i].get('image')[s:s + 25, :, :]
-    img = resize(img, (25, 256, 256), anti_aliasing=True)
-    img = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    train_images.append(img)
-    train_labels.append(np.zeros_like(img))
+    imgs = labeled_images[i].get('image')
+    for j in range(imgs.shape[0] - 30 // 5):
+        img = imgs[j*5: j*5 + 25, :, :]
+        img = resize(img, (25, 256, 256), anti_aliasing=True)
+        img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+        train_images.append(img)
+        train_labels.append(np.zeros_like(img))
+for i in range(0, 20):
+    imgs = unlabeled_images[i].get('image')
+    for j in range(imgs.shape[0] - 30 // 5):
+        img = imgs[j*5: j*5 + 25, :, :]
+        img = resize(img, (25, 256, 256), anti_aliasing=True)
+        img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+        train_images.append(img)
+        train_labels.append(np.zeros_like(img))
 print("\nData loaded successfully.")
+
+
+# train_images = []
+# train_labels = []
+# test_images = []
+# test_labels = []
+# for i in range(0, 30):
+#     if i == 3 or i == 8:
+#         continue
+#     lb = labeled_images[i].get('label')
+#     for j in range(lb.shape[0]):
+#         if 6 in lb[j, :, :]:
+#             lb = lb[j + 5:j + 30, :, :]
+#             lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
+#             lb = resize(lb, (25, 256, 256), anti_aliasing=False)
+#             lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
+#             img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
+#             img = resize(img, (25, 256, 256), anti_aliasing=True)
+#             img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+#             if i < 20:
+#                 train_images.append(img)
+#                 train_labels.append(lb)
+#             else:
+#                 test_images.append(img)
+#                 test_labels.append(lb)
+#             break
+# for i in range(0, 20):
+#     s = unlabeled_images_starts[i]
+#     img = unlabeled_images[i].get('image')[s:s + 25, :, :]
+#     img = resize(img, (25, 256, 256), anti_aliasing=True)
+#     img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+#     train_images.append(img)
+#     train_labels.append(np.zeros_like(img))
+# print("\nData loaded successfully.")
 
 
 # //////////////////////////////////// Args /////////////////////////////////////////////
