@@ -53,7 +53,7 @@ for i in range(0, 20):
         train_images.append(img)
         train_labels.append(np.zeros_like(img))
 print("\nData loaded successfully.")
-print("number of patients:", len(train_images)) 
+print("number of training subjects:", len(train_images)) 
 
 
 # train_images = []
