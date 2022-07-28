@@ -29,22 +29,27 @@ torch.autograd.set_detect_anomaly(True)
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
 
-organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"left_muscle", 9:"right_muscle"}
-SELECTED_ORGAN = 1
+organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"aorta", 11:"pancreas"}
+SELECTED_ORGAN = 6
 print("\nselected organ:", organs[SELECTED_ORGAN])
 
 images = {}
 labels = {}
-for i in range(30):
-    img = labeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
+for i in range(20, 30):
+    lb = labeled_images[i].get('label')
     id_ = labeled_images[i].get('id')
-    images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-    lbl = labeled_images[i].get('label')[30:70, :, :]
-    lbl = np.where(lbl == SELECTED_ORGAN, np.ones_like(lbl), np.zeros_like(lbl))
-    lbl = resize(lbl, (40, 256, 256), anti_aliasing=False)
-    lbl = np.where(lbl > 0, np.ones_like(lbl), np.zeros_like(lbl))
-    labels[id_] = lbl
+    for j in range(lb.shape[0]):
+        if SELECTED_ORGAN in lb[j, :, :]:
+            lb = lb[j + 5:j + 30, :, :]
+            lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
+            lb = resize(lb, (25, 256, 256), anti_aliasing=False)
+            lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
+            img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
+            img = resize(img, (25, 256, 256), anti_aliasing=True)
+            img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+            images[id_] = img
+            labels[id_] = lb
+            break
 print("\nData loaded successfully. Total patients:", len(images))
 number_of_patients = len(images)
 
@@ -55,7 +60,7 @@ class Args:
     def __init__(self):
         self.bs = 1
         self.loss = 'dice'
-        self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/fc_bottleneck/0250.pt"
+        self.load_model = "/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/fc_bottleneck/organs/liver/0070.pt"
         self.dis = 1
         self.int_steps = 7
         self.int_downsize = 2

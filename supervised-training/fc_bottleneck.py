@@ -37,27 +37,28 @@ train_images = []
 train_labels = []
 test_images = []
 test_labels = []
-for i in range(0, 30):
+for i in range(20, 30):
     if i == 3 or i == 8:
         continue
     lb = labeled_images[i].get('label')
     for j in range(lb.shape[0]):
-        if 6 in lb[j, :, :]:
-            lb = lb[j + 5:j + 30, :, :]
+        if SELECTED_ORGAN in lb[j, :, :]:
+            lb = lb[j+5:j + 30, :, :]
             lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
             lb = resize(lb, (25, 256, 256), anti_aliasing=False)
             lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
-            img = labeled_images[i].get('image')[j + 5:j + 30, :, :]
+            img = labeled_images[i].get('image')[j+5:j + 30, :, :]
             img = resize(img, (25, 256, 256), anti_aliasing=True)
             img = ((img - img.min()) / (img.max() - img.min())).astype('float')
-            if i < 20:
+            if i >= 20:
                 train_images.append(img)
                 train_labels.append(lb)
-            else:
+            
                 test_images.append(img)
                 test_labels.append(lb)
             break
 for i in range(0, 20):
+    break
     s = unlabeled_images_starts[i]
     img = unlabeled_images[i].get('image')[s:s + 25, :, :]
     img = resize(img, (25, 256, 256), anti_aliasing=True)
@@ -71,17 +72,17 @@ print("\nData loaded successfully.")
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 1
+        self.epochs = 70
         self.bs = 1
         self.loss = 'mse'
-        self.seg_w = 0.001
-        self.smooth_w = 0.0
-        self.load_model = False
-        self.initial_epoch = 0
+        self.seg_w = 0.0
+        self.smooth_w = 0.0001
+        self.load_model = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/fc_bottleneck/organs/liver/0050.pt'
+        self.initial_epoch = 50
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'conv_all_test'
-        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/' + self.run_name + '/'
+        self.run_name = 'liver'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/fc_bottleneck/organs/' + self.run_name + '/'
 
 
 args = Args()
@@ -353,12 +354,16 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
 # ///////////////////////////////////// train ////////////////////////////////////////////
 train_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_images]
+del train_images
 train_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_labels]
+del train_labels
 
 loss_history = []
 sim_loss_history = []
 seg_loss_history = []
 smooth_loss_history = []
+
+f = open(args.model_dir + 'result.txt', "a")
 
 for epoch in range(args.initial_epoch, args.epochs):
 
@@ -376,7 +381,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     epoch_seg_count = 0
     epoch_start_time = time.time()
 
-    for k in range(len(train_images) // args.bs):
+    for k in range(len(train_imgs) // args.bs):
         # shape of input = (T, bs, 1, W, H)
         input_img = torch.cat(train_imgs[k:k + args.bs], dim=1).to(device).float()
         input_lb = torch.cat(train_lbs[k:k + args.bs], dim=1).to(device).float()
@@ -412,6 +417,7 @@ for epoch in range(args.initial_epoch, args.epochs):
     msg += 'smooth_loss= %.4e, ' % epoch_smooth_loss
     msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
+    f.write(msg + '\n') 
 
     loss_history.append(epoch_loss.detach().cpu())
     sim_loss_history.append(epoch_sim_loss.detach().cpu())
@@ -437,7 +443,9 @@ plt.show()
 
 # ///////////////////////////////////// evaluate ////////////////////////////////////////////
 test_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_images]
+del test_images
 test_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_labels]
+del test_labels
 
 with torch.no_grad():
     epoch_loss = 0
@@ -448,7 +456,7 @@ with torch.no_grad():
     epoch_seg_count = 0
     epoch_start_time = time.time()
 
-    for k in range(len(test_images) // args.bs):
+    for k in range(len(test_imgs) // args.bs):
         # shape of input = (T, bs, 1, W, H)
         input_img = torch.cat(test_imgs[k:k + args.bs], dim=1).to(device).float()
         input_lb = torch.cat(test_lbs[k:k + args.bs], dim=1).to(device).float()
@@ -479,3 +487,7 @@ with torch.no_grad():
     msg += 'smooth_loss= %.4e, ' % epoch_smooth_loss
     msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
+    f.write('Evaluation Info:\n')    
+    f.write(msg + '\n')
+    
+f.close()
