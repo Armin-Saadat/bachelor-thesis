@@ -404,3 +404,5 @@ pyvenv.cfg
 pip-selfcheck.json
 
 # End of https://www.toptal.com/developers/gitignore/api/pycharm,pycharm+iml,pycharm+all,venv,python
+
+trained-models/
