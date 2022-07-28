@@ -95,8 +95,8 @@ print("number of training subjects:", len(train_images))
 class Args:
     def __init__(self):
         self.lr = 0.001
-        self.epochs = 250
-        self.bs = 100
+        self.epochs = 50
+        self.bs = 24
         self.loss = 'mse'
         self.seg_w = 0.0
         self.smooth_w = 0.0
@@ -110,7 +110,7 @@ class Args:
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)
 
-#assert args.bs == 24, "batch-size must be equal to number of pairs per patient."
+assert args.bs == 24, "batch-size must be equal to number of pairs per patient."
 
 
 # //////////////////////////////////// DataLoader /////////////////////////////////////////////
@@ -326,8 +326,8 @@ def evaluate(images, labels):
     msg += 'time= %.4f ' % (time.time() - evaluation_start_time)
     print(msg, flush=True)
 
-#print("\nEvaluation for training-set started.")
-#evaluate(train_images, train_labels)
+print("\nEvaluation for training-set started.")
+evaluate(train_images, train_labels)
 
-#print("\nEvaluation for test-set started.")
-#evaluate(test_images, test_labels)
+print("\nEvaluation for test-set started.")
+evaluate(test_images, test_labels)
