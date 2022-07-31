@@ -57,6 +57,7 @@ for i in range(0, 30):
                 test_labels.append(lb)
             break
 for i in range(0, 20):
+<<<<<<< HEAD
     break
     s = unlabeled_images_starts[i]
     img = unlabeled_images[i].get('image')[s:s + 25, :, :]
@@ -64,6 +65,23 @@ for i in range(0, 20):
     img = ((img - img.min()) / (img.max() - img.min())).astype('float')
     train_images.append(img)
     train_labels.append(np.zeros_like(img))
+=======
+    imgs = labeled_images[i].get('image')
+    for j in range((imgs.shape[0] - 30) // 25):
+        img = imgs[j*25: j*25 + 25, :, :]
+        img = resize(img, (25, 256, 256), anti_aliasing=True)
+        img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+        train_images.append(img)
+        train_labels.append(np.zeros_like(img))
+for i in range(0, 20):
+    imgs = unlabeled_images[i].get('image')
+    for j in range((imgs.shape[0] - 30) // 25):
+        img = imgs[j*25: j*25 + 25, :, :]
+        img = resize(img, (25, 256, 256), anti_aliasing=True)
+        img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+        train_images.append(img)
+        train_labels.append(np.zeros_like(img))
+>>>>>>> 49f67b6f93a41c2a6323eafa10597581deaf80a0
 print("\nData loaded successfully.")
 print("number of training subjects:", len(train_images))
 print("number of testing subjects:", len(test_images))
@@ -74,7 +92,11 @@ print("number of testing subjects:", len(test_images))
 class Args:
     def __init__(self):
         self.lr = 0.001
+<<<<<<< HEAD
         self.epochs = 70
+=======
+        self.epochs = 50
+>>>>>>> 49f67b6f93a41c2a6323eafa10597581deaf80a0
         self.bs = 24
         self.loss = 'mse'
         self.seg_w = 0.0
