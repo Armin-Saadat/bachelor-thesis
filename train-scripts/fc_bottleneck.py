@@ -22,45 +22,68 @@ import neurite as ne
 device = 'cuda'
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 torch.backends.cudnn.deterministic = True
-
+torch.autograd.set_detect_anomaly(True)
 
 # ////////////////////////////////////////// load & normalize ///////////////////////////////////////
+organs = {0:"background", 1:"spleen", 2:"left_kidney", 3:"right_kidney", 6:"liver", 8:"aorta", 11:"pancreas"}
+SELECTED_ORGAN = 6
+print("\nselected organ:", organs[SELECTED_ORGAN])
 
 labeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/labeled_images.npy', allow_pickle=True)
 unlabeled_images = np.load('/home/adeleh/MICCAI-2022/UMIS-data/medical-data/synaps/unlabeled_images.npy', allow_pickle=True)
+unlabeled_images_starts = [55, 60, 100, 40, 40, 80, 80, 75, 95, 55, 100, 50, 45, 45, 110, 60, 65, 55, 45, 95]
 
-images = {}
-for i in range(30):
-    img = labeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
-    id_ = labeled_images[i].get('id')
-    images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-for i in range(20):
-    img = unlabeled_images[i].get('image')[30:70, :, :]
-    img = resize(img, (40, 256, 256), anti_aliasing=True)
-    id_ = unlabeled_images[i].get('id')
-    images[id_] = ((img - img.min()) / (img.max() - img.min())).astype('float')
-print("\nData loaded successfully. Total patients:", len(images))
-
-## verify normalize
-#print('Images:')
-#for p_id in images.keys():
-#    print(str(p_id) + ":", images.get(p_id).min(), "-", images.get(p_id).max())
+train_images = []
+train_labels = []
+test_images = []
+test_labels = []
+for i in range(20, 30):
+    if i == 3 or i == 8:
+        continue
+    lb = labeled_images[i].get('label')
+    for j in range(lb.shape[0]):
+        if SELECTED_ORGAN in lb[j, :, :]:
+            lb = lb[j+5:j + 30, :, :]
+            lb = np.where(lb == SELECTED_ORGAN, np.ones_like(lb), np.zeros_like(lb))
+            lb = resize(lb, (25, 256, 256), anti_aliasing=False)
+            lb = ((lb - lb.min()) / (lb.max() - lb.min())).astype('float')
+            img = labeled_images[i].get('image')[j+5:j + 30, :, :]
+            img = resize(img, (25, 256, 256), anti_aliasing=True)
+            img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+            if i >= 20:
+                train_images.append(img)
+                train_labels.append(lb)
+            
+                test_images.append(img)
+                test_labels.append(lb)
+            break
+for i in range(0, 20):
+    break
+    s = unlabeled_images_starts[i]
+    img = unlabeled_images[i].get('image')[s:s + 25, :, :]
+    img = resize(img, (25, 256, 256), anti_aliasing=True)
+    img = ((img - img.min()) / (img.max() - img.min())).astype('float')
+    train_images.append(img)
+    train_labels.append(np.zeros_like(img))
+print("\nData loaded successfully.")
 
 # //////////////////////////////////// Args /////////////////////////////////////////////
 
 class Args:
     def __init__(self):
-        self.lr = 0.0005
-        self.epochs = 250
-        self.bs = 2
+        self.lr = 0.001
+        self.epochs = 70
+        self.bs = 1
         self.loss = 'mse'
-        self.load_model = False
-        self.initial_epoch = 0
+        self.seg_w = 0.0
+        self.smooth_w = 0.0001
+        self.load_model = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/fc_bottleneck/organs/liver/0050.pt'
+        self.initial_epoch = 50
         self.int_steps = 7
         self.int_downsize = 2
-        self.run_name = 'fc_bottleneck_lr0005_long'
-        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/256x256/' + self.run_name + '/'
+        self.run_name = 'liver'
+        self.model_dir = '/home/adeleh/MICCAI-2022/armin/master-thesis/trained-models/fc_bottleneck/organs/' + self.run_name + '/'
+
 
 args = Args()
 os.makedirs(args.model_dir, exist_ok=True)
@@ -71,7 +94,10 @@ if args.loss == 'ncc':
 elif args.loss == 'mse':
     sim_loss_func = vxm.losses.MSE().loss
 else:
-    raise ValueError('Image loss should be "mse" or "ncc", but found "%s"' % args.image_loss)
+    raise ValueError('Image loss should be "mse" or "ncc", but found "%s"' % args.loss)
+
+smooth_loss_func = vxm.losses.Grad('l2', loss_mult=args.int_downsize).loss
+seg_loss_func = vxm.losses.Dice().loss
 
 
 # /////////////////////////////////////// model //////////////////////////////////////////
@@ -268,7 +294,7 @@ class FC_Bottleneck(nn.Module):
 
         self.spatial_transformer = SpatialTransformer(size=image_size)
 
-    def forward(self, images, labels=None):
+    def forward(self, images, labels):
         # shape of imgs/lbs: (T, bs, 1, 256, 256)
         T, bs = images.shape[0], images.shape[1]
 
@@ -289,23 +315,34 @@ class FC_Bottleneck(nn.Module):
 
         # shape of flow: (T-1, bs, 2, 256, 256)
         Y = [self.unet(lstm_out[i], 'decode', X_history[i]).unsqueeze(0) for i in range(T-1)]
-        flow = torch.cat(Y, dim=0)
+        flows = torch.cat(Y, dim=0)
 
-        # shape of moved_images = (T-1, bs, 1, 256, 256)
-        moved_images = torch.cat(
-            [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(images[:-1], flow)], dim=0)
+        sim_loss = 0
+        seg_loss = 0
+        labeled_slices_count = 0
+        smooth_loss = 0
+        for src_img, trg_img, src_lb, trg_lb, flow in zip(images[:-1], images[1:], labels[:-1], labels[1:], flows):
+            moved_img = self.spatial_transformer(src_img, flow)
+            moved_lb = self.spatial_transformer(src_lb, flow)
 
-        if labels is not None:
-            moved_labels = torch.cat(
-                [self.spatial_transformer(src, flow).unsqueeze(0) for src, flow in zip(labels[:-1], flow)], dim=0)
-            return [moved_images, moved_labels, flow]
+            sim_loss += sim_loss_func(trg_img, moved_img)
+            smooth_loss += smooth_loss_func(_, flow)
+            if src_lb.max() != 0:
+                seg_loss += seg_loss_func(trg_lb, moved_lb)
+                labeled_slices_count += 1
+
+        if labeled_slices_count == 0:
+            return  sim_loss / (T - 1), 0, smooth_loss / (T - 1)
         else:
-            return [moved_images, flow]
+            return sim_loss / (T - 1), seg_loss / labeled_slices_count, smooth_loss / (T - 1)
 
-model = FC_Bottleneck((256,256))
+
+model = FC_Bottleneck((256, 256))
 if args.load_model:
+    print("loading model ...")
     snapshot = torch.load(args.load_model, map_location='cpu')
     model.load_state_dict(snapshot['model_state_dict'])
+    print("model loaded successfully.")
 
 model.to(device)
 _ = model.train()
@@ -314,11 +351,19 @@ print('number of all params:', sum(p.numel() for p in model.parameters()))
 print('number of trainable params:', sum(p.numel() for p in model.parameters() if p.requires_grad))
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-data = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in images.values()]
 
 # ///////////////////////////////////// train ////////////////////////////////////////////
+train_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_images]
+del train_images
+train_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in train_labels]
+del train_labels
 
 loss_history = []
+sim_loss_history = []
+seg_loss_history = []
+smooth_loss_history = []
+
+f = open(args.model_dir + 'result.txt', "a")
 
 for epoch in range(args.initial_epoch, args.epochs):
 
@@ -329,20 +374,22 @@ for epoch in range(args.initial_epoch, args.epochs):
         del snapshot
 
     epoch_loss = 0
+    epoch_sim_loss = 0
+    epoch_seg_loss = 0
+    epoch_smooth_loss = 0
     epoch_length = 0
+    epoch_seg_count = 0
     epoch_start_time = time.time()
 
-    for k in range(50 // args.bs):
+    for k in range(len(train_imgs) // args.bs):
         # shape of input = (T, bs, 1, W, H)
-        input = torch.cat(data[k:k + args.bs], dim=1)
-        k += args.bs    
-        input = input.to(device).float()
+        input_img = torch.cat(train_imgs[k:k + args.bs], dim=1).to(device).float()
+        input_lb = torch.cat(train_lbs[k:k + args.bs], dim=1).to(device).float()
+        k += args.bs
 
         # predict
-        moved_img, flow = model(input)
-
-        # calculate loss
-        loss = sim_loss_func(input[1:, ...], moved_img)
+        sim_loss, seg_loss, smooth_loss = model(input_img, input_lb)
+        loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
 
         # backpropagate and optimize
         optimizer.zero_grad()
@@ -350,25 +397,97 @@ for epoch in range(args.initial_epoch, args.epochs):
         optimizer.step()
 
         epoch_loss += loss * args.bs
+        epoch_sim_loss += sim_loss * args.bs
+        if seg_loss != 0:
+            epoch_seg_loss += seg_loss * args.bs
+            epoch_seg_count += args.bs
+        epoch_smooth_loss += smooth_loss * args.bs
         epoch_length += args.bs
 
     epoch_loss /= epoch_length
+    epoch_sim_loss /= epoch_length
+    epoch_seg_loss /= epoch_seg_count
+    epoch_smooth_loss /= epoch_length
 
     # print epoch info
     msg = 'epoch %d/%d, ' % (epoch + 1, args.epochs)
     msg += 'loss= %.4e, ' % epoch_loss
+    msg += 'sim_loss= %.4e, ' % epoch_sim_loss
+    msg += 'seg_loss= %.4f, ' % epoch_seg_loss
+    msg += 'smooth_loss= %.4e, ' % epoch_smooth_loss
     msg += 'time= %.4f ' % (time.time() - epoch_start_time)
     print(msg, flush=True)
+    f.write(msg + '\n') 
 
     loss_history.append(epoch_loss.detach().cpu())
+    sim_loss_history.append(epoch_sim_loss.detach().cpu())
+    seg_loss_history.append(epoch_seg_loss.detach().cpu())
+    smooth_loss_history.append(epoch_smooth_loss.detach().cpu())
 
 # final model save
 snapshot = {'model_state_dict': model.state_dict()}
 torch.save(snapshot, os.path.join(args.model_dir, '%04d.pt' % args.epochs))
 del snapshot
 
-plt.plot(loss_history)
-plt.xlabel('epoch')
-plt.ylabel('loss')
+figure, axis = plt.subplots(1, 4, figsize=(60, 15))
+axis[0].plot(loss_history)
+axis[0].set_title("Final Loss")
+axis[1].plot(sim_loss_history)
+axis[1].set_title("Similarity Loss")
+axis[2].plot(seg_loss_history)
+axis[2].set_title("Segmentation Loss")
+axis[3].plot(smooth_loss_history)
+axis[3].set_title("Smooth Loss")
 plt.savefig(args.model_dir + args.run_name + '.png')
 plt.show()
+
+# ///////////////////////////////////// evaluate ////////////////////////////////////////////
+test_imgs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_images]
+del test_images
+test_lbs = [torch.tensor(p_imgs).unsqueeze(1).unsqueeze(1) for p_imgs in test_labels]
+del test_labels
+
+with torch.no_grad():
+    epoch_loss = 0
+    epoch_sim_loss = 0
+    epoch_seg_loss = 0
+    epoch_smooth_loss = 0
+    epoch_length = 0
+    epoch_seg_count = 0
+    epoch_start_time = time.time()
+
+    for k in range(len(test_imgs) // args.bs):
+        # shape of input = (T, bs, 1, W, H)
+        input_img = torch.cat(test_imgs[k:k + args.bs], dim=1).to(device).float()
+        input_lb = torch.cat(test_lbs[k:k + args.bs], dim=1).to(device).float()
+        k += args.bs
+
+        # predict
+        sim_loss, seg_loss, smooth_loss = model(input_img, input_lb)
+        loss = sim_loss + args.seg_w * seg_loss + args.smooth_w * smooth_loss
+
+        epoch_loss += loss * args.bs
+        epoch_sim_loss += sim_loss * args.bs
+        if seg_loss != 0:
+            epoch_seg_loss += seg_loss * args.bs
+            epoch_seg_count += args.bs
+        epoch_smooth_loss += smooth_loss * args.bs
+        epoch_length += args.bs
+
+    epoch_loss /= epoch_length
+    epoch_sim_loss /= epoch_length
+    epoch_seg_loss /= epoch_seg_count
+    epoch_smooth_loss /= epoch_length
+
+    # print epoch info
+    print('\nEvaluation results on test dataset:')
+    msg = 'loss= %.4e, ' % epoch_loss
+    msg += 'sim_loss= %.4e, ' % epoch_sim_loss
+    msg += 'seg_loss= %.4f, ' % epoch_seg_loss
+    msg += 'smooth_loss= %.4e, ' % epoch_smooth_loss
+    msg += 'time= %.4f ' % (time.time() - epoch_start_time)
+    print(msg, flush=True)
+    f.write('Evaluation Info:\n')    
+    f.write(msg + '\n')
+    
+f.close()
